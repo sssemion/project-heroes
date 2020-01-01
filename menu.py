@@ -1,6 +1,7 @@
 import pygame
 import os
 import sys
+import random
 
 pygame.init()
 screen_info = pygame.display.Info()
@@ -83,7 +84,7 @@ class Field:  # Игровое поле
                     Tile('rock', x, y)
                 elif self.field[x][y] == '@':
                     Tile('grass', x, y)
-                    self.player = Player(x, y)
+                    self.player = Player(x, y, 'green')
                     self.field[x] = self.field[x][:y] + '.' + self.field[x][y + 1:]
 
     def move(self, direction):
@@ -101,12 +102,27 @@ class Field:  # Игровое поле
             if x < self.width - 1 and self.field[y][x + 1] == '.':
                 self.player.move(x + 1, y)
 
+    def get_click(self, mouse_pos):
+        cell = self.get_cell(mouse_pos)
+        if cell is not None:
+            self.on_click(cell)
+
+    def get_cell(self, mouse_pos):
+        if not (Field.margin_left <= mouse_pos[0] <= Field.margin_left + self.width * tile_width) or not (
+                Field.margin_top <= mouse_pos[1] <= Field.margin_top + self.height * tile_height):
+            return None
+        return (mouse_pos[1] - Field.margin_top) // tile_height, (mouse_pos[0] - Field.margin_left) // tile_width
+
+    def on_click(self, cell_coords):
+        pass
+
 
 class Player(pygame.sprite.Sprite):
     image = load_image('player.png', -1)
 
-    def __init__(self, pos_y, pos_x):
+    def __init__(self, pos_y, pos_x, team):
         super().__init__(players)
+        self.team = team
         self.image = pygame.transform.scale(self.image, (tile_width, tile_height))
         self.rect = self.image.get_rect().move(tile_width * pos_x,
                                                tile_height * pos_y)
@@ -207,6 +223,63 @@ class Button(pygame.sprite.Sprite):
 
         self.surface.blit(self.image, (self.x, self.y))
 
+# Здесь нужно сделать всё по красоте, чтобы он наследовался от спрайта и рисовался во время битвы,
+# ведь я всего лишь бэкэнд - лох, а ты фронтенд гений!!! TODO
+class Unit:
+    def __init__(self, name, attack, defence, min_dmg, max_dmg, count, speed, hp, town):
+        self.dead = 0
+        self.counter = True
+        self.top_hp = hp
+        self.town = town
+        self.count, self.name, self.atc, self.dfc, self.min_dmg, self.max_dmg, self.spd, self.hp = count, name, attack, defence, min_dmg, max_dmg, speed, hp
+
+    def attack_rat(self, enemy):
+        damage = random.randint(self.min_dmg, self.max_dmg) * (self.atc / enemy.dfc) * (self.count + 1)
+        enemy.get_rat_damage(damage)
+
+    def attack_hon(self, enemy):
+        damage = random.randint(self.min_dmg, self.max_dmg) * (self.atc / enemy.dfc) * (self.count + 1)
+        if enemy.counter:
+            enemy.get_honest_damage(damage, self)
+        else:
+            enemy.get_rat_damage(damage)
+
+    def get_honest_damage(self, damage, attacker):
+        self.count -= damage // self.hp
+        self.top_hp -= damage % self.hp
+        if self.count >= 0:
+            self.counter = False
+            attacker.get_rat_damage(
+                random.randint(self.min_dmg, self.max_dmg) * (self.atc / attacker.dfc) * (self.count + 1))
+        else:
+            self.dead = 1
+
+    def get_rat_damage(self, damage):
+        self.count -= damage // self.hp
+        self.top_hp -= damage % self.hp
+        if self.count < 0:
+            self.dead = 1
+
+    def __lt__(self, other):
+        if self.spd < other.spd:
+            return True
+        return False
+
+    def __le__(self, other):
+        if self.spd <= other.spd:
+            return True
+        return False
+
+    def __gt__(self, other):
+        if self.spd > other.spd:
+            return True
+        return False
+
+    def __ge__(self, other):
+        if self.spd >= other.spd:
+            return True
+        return False
+
 
 def start_screen():
     intro_text = []
@@ -277,6 +350,12 @@ while running:
                 field.move('left')
             if event.key == pygame.K_RIGHT:
                 field.move('right')
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1:
+                edge_x, edge_y = field.size_in_pixels
+                x, y = event.pos
+                if x < edge_x and y < edge_y:
+                    print(1)
     all_sprites.draw(screen)
     tiles.draw(field.space)
     players.draw(field.space)
