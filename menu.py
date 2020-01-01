@@ -10,6 +10,8 @@ clock = pygame.time.Clock()
 FPS = 60
 running = True
 
+tile_width = tile_height = 0
+
 
 def terminate():
     pygame.quit()
@@ -28,6 +30,88 @@ def load_image(name, colorkey=None):
     return image
 
 
+# Sprite groups
+all_sprites = pygame.sprite.Group()
+buttons = pygame.sprite.Group()
+tiles = pygame.sprite.Group()
+players = pygame.sprite.Group()
+
+
+class Field:  # Игровое поле
+    def __init__(self, filename):
+        filename = "data/maps/" + filename
+        with open(filename, 'r') as mapFile:
+            level_map = [line.strip() for line in mapFile]
+        max_width = max(map(len, level_map))
+        # дополняем каждую строку пустыми клетками ('.')
+        self.field = list(map(lambda x: x.ljust(max_width, '.'), level_map))
+        self.width = len(self.field[0])
+        self.height = len(self.field)
+        self.player = None
+
+        global tile_width, tile_height
+        tile_width = tile_height = max(WIDTH // self.width, HEIGHT // self.height)
+
+        self.render()
+
+    def render(self):
+        for x in range(self.height):
+            for y in range(self.width):
+                if self.field[x][y] == '.':
+                    Tile('grass', x, y)
+                elif self.field[x][y] == '#':
+                    Tile('grass', x, y)
+                    Tile('rock', x, y)
+                elif self.field[x][y] == '@':
+                    Tile('grass', x, y)
+                    self.player = Player(x, y)
+                    self.field[x] = self.field[x][:y] + '.' + self.field[x][y + 1:]
+
+    def move(self, direction):
+        x, y = self.player.get_pos()
+        if direction == 'up':
+            if y > 0 and self.field[y - 1][x] == '.':
+                self.player.move(x, y - 1)
+        elif direction == 'down':
+            if y < self.height - 1 and self.field[y + 1][x] == '.':
+                self.player.move(x, y + 1)
+        elif direction == 'left':
+            if x > 0 and self.field[y][x - 1] == '.':
+                self.player.move(x - 1, y)
+        elif direction == 'right':
+            if x < self.width - 1 and self.field[y][x + 1] == '.':
+                self.player.move(x + 1, y)
+
+
+class Player(pygame.sprite.Sprite):
+    image = load_image('player.png', -1)
+
+    def __init__(self, pos_y, pos_x):
+        super().__init__(players, all_sprites)
+        self.image = pygame.transform.scale(self.image, (tile_width, tile_height))
+        self.rect = self.image.get_rect().move(tile_width * pos_x, tile_height * pos_y)
+        self.pos = pos_x, pos_y
+
+    def move(self, x, y):
+        self.pos = x, y
+        self.rect = self.image.get_rect().move(tile_width * x, tile_height * y)
+
+    def get_pos(self):
+        return self.pos
+
+
+class Tile(pygame.sprite.Sprite):
+    tile_images = {
+        'grass': load_image("grass.png"),
+        'rock': load_image("rock.png", -1),
+    }
+
+    def __init__(self, tile_type, pos_y, pos_x):
+        super().__init__(tiles, all_sprites)
+        self.image = pygame.transform.scale(Tile.tile_images[tile_type], (tile_width, tile_height))
+        self.rect = self.image.get_rect().move(tile_width * pos_x, tile_height * pos_y)
+
+
 class Button(pygame.sprite.Sprite):
     def __init__(self, group, surface, x, y, width, height, function=lambda: None):
         super().__init__(group)
@@ -41,7 +125,6 @@ class Button(pygame.sprite.Sprite):
         self.clicked = False
 
     def on_click(self, event):
-        self.clicked = False
         if self.x < event.pos[0] < self.x + self.width \
                 and self.y < event.pos[1] < self.y + self.height:
             self.clicked = True
@@ -69,6 +152,7 @@ class Button(pygame.sprite.Sprite):
         self.textcolor = color
 
     def update(self, *args):
+        self.clicked = False
         for arg in args:
             if arg.type == pygame.MOUSEBUTTONDOWN:
                 self.on_click(arg)
@@ -86,7 +170,6 @@ class Button(pygame.sprite.Sprite):
             black = pygame.Surface((self.width, self.height))
             black.fill(pygame.Color(0, 0, 0))
             black.set_alpha(32 + 32 * self.clicked)
-            self.clicked = False
             self.image.blit(black, (0, 0))
 
         self.rect = self.image.get_rect()
@@ -119,7 +202,6 @@ def start_screen():
         text_coord += intro_rect.height
         screen.blit(string_rendered, intro_rect)
 
-    buttons = pygame.sprite.Group()
     bwidth, bheight = 400, 80
 
     start_button = Button(buttons, screen, (WIDTH - bwidth) // 2, (HEIGHT - bheight * 4) // 2,
@@ -148,32 +230,33 @@ def start_screen():
             if event.type == pygame.QUIT or (
                     event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                 terminate()
-            if event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
-                pass
-            if event.type == pygame.MOUSEMOTION:
-                pass
+            if start_button.clicked:
+                return
             buttons.update(event)
         pygame.display.flip()
         clock.tick(FPS)
 
 
-start_screen()
+start_screen()  # Main menu
+
+field = Field("example.txt")  # Игровое поле
 
 while running:
     for event in pygame.event.get():
-        if event.type == pygame.QUIT:
+        if event.type == pygame.QUIT or (
+                event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
             terminate()
-        # elif event.type == pygame.KEYDOWN:
-        #     if event.key == pygame.K_UP:
-        #         move(player, 'up')
-        #     if event.key == pygame.K_DOWN:
-        #         move(player, 'down')
-        #     if event.key == pygame.K_LEFT:
-        #         move(player, 'left')
-        #     if event.key == pygame.K_RIGHT:
-        #         move(player, 'right')
-    # all_sprites.draw(screen)
-    # tiles_group.draw(screen)
-    # player_group.draw(screen)
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_UP:
+                field.move('up')
+            if event.key == pygame.K_DOWN:
+                field.move('down')
+            if event.key == pygame.K_LEFT:
+                field.move('left')
+            if event.key == pygame.K_RIGHT:
+                field.move('right')
+    all_sprites.draw(screen)
+    tiles.draw(screen)
+    players.draw(screen)
     pygame.display.flip()
     clock.tick(FPS)
