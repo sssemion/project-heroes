@@ -10,7 +10,7 @@ clock = pygame.time.Clock()
 FPS = 60
 running = True
 
-tile_width = tile_height = 0
+tile_width = tile_height = 50
 
 
 def terminate():
@@ -20,7 +20,7 @@ def terminate():
 
 def load_image(name, colorkey=None):
     fullname = os.path.join('data/images', name)
-    image = pygame.image.load(fullname).convert()
+    image = pygame.image.load(fullname).convert_alpha()
     if colorkey is not None:
         if colorkey == -1:
             colorkey = image.get_at((0, 0))
@@ -37,7 +37,21 @@ tiles = pygame.sprite.Group()
 players = pygame.sprite.Group()
 
 
+class ControlPanel:  # Панель управления в правой части экрана
+    width = 200  # px
+
+
+class ResourcePanel:  # Панель ресурсов в нижней части экрана
+    height = 40  # px
+
+
 class Field:  # Игровое поле
+    size_in_pixels = WIDTH - ControlPanel.width, HEIGHT - ResourcePanel.height
+    margin_top = int(15 / 732 * size_in_pixels[1])
+    margin_right = int(13 / 1171 * size_in_pixels[0])
+    margin_left = int(15 / 1171 * size_in_pixels[0])
+    margin_bottom = int(16 / 732 * size_in_pixels[1])
+
     def __init__(self, filename):
         filename = "data/maps/" + filename
         with open(filename, 'r') as mapFile:
@@ -49,12 +63,17 @@ class Field:  # Игровое поле
         self.height = len(self.field)
         self.player = None
 
-        global tile_width, tile_height
-        tile_width = tile_height = max(WIDTH // self.width, HEIGHT // self.height)
-
         self.render()
 
     def render(self):
+        self.frame = pygame.transform.scale(load_image('frame.png'), Field.size_in_pixels)
+        screen.blit(self.frame, (0, 0))
+        w, h = self.frame.get_size()
+        self.space = pygame.Surface((w - Field.margin_right - Field.margin_left,
+                                     h - Field.margin_top - Field.margin_bottom))
+        self.space.blit(
+            pygame.transform.scale(load_image('black-texture.png'), (w, w)), (0, 0))
+
         for x in range(self.height):
             for y in range(self.width):
                 if self.field[x][y] == '.':
@@ -87,14 +106,16 @@ class Player(pygame.sprite.Sprite):
     image = load_image('player.png', -1)
 
     def __init__(self, pos_y, pos_x):
-        super().__init__(players, all_sprites)
+        super().__init__(players)
         self.image = pygame.transform.scale(self.image, (tile_width, tile_height))
-        self.rect = self.image.get_rect().move(tile_width * pos_x, tile_height * pos_y)
+        self.rect = self.image.get_rect().move(tile_width * pos_x,
+                                               tile_height * pos_y)
         self.pos = pos_x, pos_y
 
     def move(self, x, y):
         self.pos = x, y
-        self.rect = self.image.get_rect().move(tile_width * x, tile_height * y)
+        self.rect = self.image.get_rect().move(tile_width * x,
+                                               tile_height * y)
 
     def get_pos(self):
         return self.pos
@@ -107,9 +128,10 @@ class Tile(pygame.sprite.Sprite):
     }
 
     def __init__(self, tile_type, pos_y, pos_x):
-        super().__init__(tiles, all_sprites)
+        super().__init__(tiles)
         self.image = pygame.transform.scale(Tile.tile_images[tile_type], (tile_width, tile_height))
-        self.rect = self.image.get_rect().move(tile_width * pos_x, tile_height * pos_y)
+        self.rect = self.image.get_rect().move(tile_width * pos_x,
+                                               tile_height * pos_y)
 
 
 class Button(pygame.sprite.Sprite):
@@ -238,7 +260,7 @@ def start_screen():
 
 
 start_screen()  # Main menu
-
+screen.fill(0xff0000)
 field = Field("example.txt")  # Игровое поле
 
 while running:
@@ -256,7 +278,8 @@ while running:
             if event.key == pygame.K_RIGHT:
                 field.move('right')
     all_sprites.draw(screen)
-    tiles.draw(screen)
-    players.draw(screen)
+    tiles.draw(field.space)
+    players.draw(field.space)
+    screen.blit(field.space, (Field.margin_right, Field.margin_top))
     pygame.display.flip()
     clock.tick(FPS)
