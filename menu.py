@@ -36,6 +36,46 @@ all_sprites = pygame.sprite.Group()
 buttons = pygame.sprite.Group()
 tiles = pygame.sprite.Group()
 players = pygame.sprite.Group()
+units = pygame.sprite.Group()
+
+
+class Block:  # Предмет, блокирующий проход
+    def __init__(self, tile_type='rock'):
+        self.tile_type = tile_type
+
+    def render(self, x, y):
+        Tile(self.tile_type, x, y)
+
+
+class Item:
+    def __init__(self, tile_type='coins'):
+        self.tile_type = tile_type
+
+    def render(self, x, y):
+        Tile(self.tile_type, x, y)
+
+
+class Cell:  # Ячейка поля Field
+    def __init__(self, cost=0, tile_type='grass', content=None):
+        self.cost = cost  # cost - стоимость передвижения по клетке
+        self.tile_type = tile_type
+        self.content = content  # content - содержимое ячейки (None, экземпляр класса Block или любой другой объект)
+
+    def get_cost(self):
+        return self.cost
+
+    def is_blocked(self):
+        return type(self.content).__name__ == 'Block'
+
+    def get_content(self):
+        return self.content
+
+    def render(self, x, y):
+        Tile(self.tile_type, x, y)
+        try:
+            self.content.render(x, y)
+        except AttributeError:
+            pass
 
 
 class ControlPanel:  # Панель управления в правой части экрана
@@ -59,7 +99,7 @@ class Field:  # Игровое поле
             level_map = [line.strip() for line in mapFile]
         max_width = max(map(len, level_map))
         # дополняем каждую строку пустыми клетками ('.')
-        self.field = list(map(lambda x: x.ljust(max_width, '.'), level_map))
+        self.field = list(map(lambda x: list(x.ljust(max_width, '.')), level_map))
         self.width = len(self.field[0])
         self.height = len(self.field)
         self.player = None
@@ -78,29 +118,32 @@ class Field:  # Игровое поле
         for x in range(self.height):
             for y in range(self.width):
                 if self.field[x][y] == '.':
-                    Tile('grass', x, y)
+                    self.field[x][y] = Cell()
                 elif self.field[x][y] == '#':
-                    Tile('grass', x, y)
-                    Tile('rock', x, y)
+                    self.field[x][y] = Cell(content=Block())
                 elif self.field[x][y] == '@':
-                    Tile('grass', x, y)
+                    self.field[x][y] = Cell()
                     self.player = Player(x, y, 'green')
-                    self.field[x] = self.field[x][:y] + '.' + self.field[x][y + 1:]
+                elif self.field[x][y] == '0':
+                    self.field[x][y] = Cell(content=Item())
+                self.field[x][y].render(x, y)
 
     def move(self, direction):
         x, y = self.player.get_pos()
         if direction == 'up':
-            if y > 0 and self.field[y - 1][x] == '.':
+            if y > 0 and not self.field[y - 1][x].is_blocked():
                 self.player.move(x, y - 1)
         elif direction == 'down':
-            if y < self.height - 1 and self.field[y + 1][x] == '.':
+            if y < self.height - 1 and not self.field[y + 1][x].is_blocked():
                 self.player.move(x, y + 1)
         elif direction == 'left':
-            if x > 0 and self.field[y][x - 1] == '.':
+            if x > 0 and not self.field[y][x - 1].is_blocked():
                 self.player.move(x - 1, y)
         elif direction == 'right':
-            if x < self.width - 1 and self.field[y][x + 1] == '.':
+            if x < self.width - 1 and not self.field[y][x + 1].is_blocked():
                 self.player.move(x + 1, y)
+        # TODO: если player находится на клетке, в которой лежит item (type(cell.content).__name__ == "Item"),
+        #  нужно добавлять этот item в инвентарь и убирать с клетки
 
     def get_click(self, mouse_pos):
         cell = self.get_cell(mouse_pos)
@@ -141,6 +184,7 @@ class Tile(pygame.sprite.Sprite):
     tile_images = {
         'grass': load_image("grass.png"),
         'rock': load_image("rock.png", -1),
+        'coins': load_image("coins.png"),
     }
 
     def __init__(self, tile_type, pos_y, pos_x):
@@ -223,28 +267,46 @@ class Button(pygame.sprite.Sprite):
 
         self.surface.blit(self.image, (self.x, self.y))
 
+
 # Здесь нужно сделать всё по красоте, чтобы он наследовался от спрайта и рисовался во время битвы,
 # ведь я всего лишь бэкэнд - лох, а ты фронтенд гений!!! TODO
-class Unit:
-    def __init__(self, name, attack, defence, min_dmg, max_dmg, count, speed, hp, town):
+class Unit(pygame.sprite.Sprite):
+    def __init__(self, pos_x, pos_y, name, attack, defence, min_dmg, max_dmg, count, speed, hp, town,
+                 image="Player.png"):
+        super().__init__(units)
         self.dead = 0
         self.counter = True
         self.top_hp = hp
         self.town = town
-        self.count, self.name, self.atc, self.dfc, self.min_dmg, self.max_dmg, self.spd, self.hp = count, name, attack, defence, min_dmg, max_dmg, speed, hp
+        self.count, self.name, self.atc, self.dfc, self.min_dmg, self.max_dmg, self.spd, self.hp = \
+            count, name, attack, defence, min_dmg, max_dmg, speed, hp
+        self.image = pygame.transform.scale(load_image(image, -1), (tile_width, tile_height))
+        self.pos = pos_x, pos_y
+        # self.rect = self.image.get_rect().move(tile_width * pos_x, tile_height * pos_y)
 
-    def attack_rat(self, enemy):
+    def get_pos(self):
+        return self.pos
+
+    def update(self):
+        pass
+
+    def set_image(self, filename):
+        self.image = pygame.transform.scale(load_image(filename, -1), (tile_width, tile_height))
+        pos_x, pos_y = self.get_pos()
+        # self.rect = self.image.get_rect().move(tile_width * pos_x, tile_height * pos_y)
+
+    def attack_rat(self, enemy):  # Атаковать "по-крысиному" (не получать ответный урон)
         damage = random.randint(self.min_dmg, self.max_dmg) * (self.atc / enemy.dfc) * (self.count + 1)
         enemy.get_rat_damage(damage)
 
-    def attack_hon(self, enemy):
+    def attack_hon(self, enemy):  # Атаковать честно (получить ответный урон)
         damage = random.randint(self.min_dmg, self.max_dmg) * (self.atc / enemy.dfc) * (self.count + 1)
         if enemy.counter:
             enemy.get_honest_damage(damage, self)
         else:
             enemy.get_rat_damage(damage)
 
-    def get_honest_damage(self, damage, attacker):
+    def get_honest_damage(self, damage, attacker):  # Получить честный урон (и дать ответный)
         self.count -= damage // self.hp
         self.top_hp -= damage % self.hp
         if self.count >= 0:
@@ -254,28 +316,28 @@ class Unit:
         else:
             self.dead = 1
 
-    def get_rat_damage(self, damage):
+    def get_rat_damage(self, damage):  # Получить безответный урон
         self.count -= damage // self.hp
         self.top_hp -= damage % self.hp
         if self.count < 0:
             self.dead = 1
 
-    def __lt__(self, other):
+    def __lt__(self, other):  # <
         if self.spd < other.spd:
             return True
         return False
 
-    def __le__(self, other):
+    def __le__(self, other):  # <=
         if self.spd <= other.spd:
             return True
         return False
 
-    def __gt__(self, other):
+    def __gt__(self, other):  # >
         if self.spd > other.spd:
             return True
         return False
 
-    def __ge__(self, other):
+    def __ge__(self, other):  # >=
         if self.spd >= other.spd:
             return True
         return False
@@ -335,6 +397,8 @@ def start_screen():
 start_screen()  # Main menu
 screen.fill(0xff0000)
 field = Field("example.txt")  # Игровое поле
+
+devil = Unit(0, 0, 'devil', 10, 10, 5, 15, 2, 5, 100, 'Town', 'devil.png')
 
 while running:
     for event in pygame.event.get():
