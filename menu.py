@@ -3,6 +3,10 @@ import os
 import sys
 import random
 
+GREEN, RED, BLUE, YELLOW = 'green', 'red', 'blue', 'yellow'
+
+N = int(input())  # tmp
+
 pygame.init()
 screen_info = pygame.display.Info()
 WIDTH, HEIGHT = screen_info.current_w, screen_info.current_h
@@ -33,22 +37,14 @@ def load_image(name, colorkey=None):
 
 # Sprite groups
 all_sprites = pygame.sprite.Group()
-buttons = pygame.sprite.Group()
-tiles = pygame.sprite.Group()
-players = pygame.sprite.Group()
-units = pygame.sprite.Group()
+button_sprites = pygame.sprite.Group()
+tile_sprites = pygame.sprite.Group()
+player_sprites = pygame.sprite.Group()
+unit_sprites = pygame.sprite.Group()
 
 
 class Block:  # Предмет, блокирующий проход
     def __init__(self, tile_type='rock'):
-        self.tile_type = tile_type
-
-    def render(self, x, y):
-        Tile(self.tile_type, x, y)
-
-
-class Item:
-    def __init__(self, tile_type='coins'):
         self.tile_type = tile_type
 
     def render(self, x, y):
@@ -93,7 +89,7 @@ class Field:  # Игровое поле
     margin_left = int(15 / 1171 * size_in_pixels[0])
     margin_bottom = int(16 / 732 * size_in_pixels[1])
 
-    def __init__(self, filename):
+    def __init__(self, filename, number_of_players=1):
         filename = "data/maps/" + filename
         with open(filename, 'r') as mapFile:
             level_map = [line.strip() for line in mapFile]
@@ -102,7 +98,9 @@ class Field:  # Игровое поле
         self.field = list(map(lambda x: list(x.ljust(max_width, '.')), level_map))
         self.width = len(self.field[0])
         self.height = len(self.field)
-        self.player = None
+        self.players = {}
+
+        self.number_of_players = number_of_players
 
         self.render()
 
@@ -121,29 +119,60 @@ class Field:  # Игровое поле
                     self.field[x][y] = Cell()
                 elif self.field[x][y] == '#':
                     self.field[x][y] = Cell(content=Block())
-                elif self.field[x][y] == '@':
-                    self.field[x][y] = Cell()
-                    self.player = Player(x, y, 'green')
+                elif self.field[x][y] == 'G':
+                    self.players[GREEN] = [Player(x, y, GREEN)]
+                    self.field[x][y] = Cell(content=self.players[GREEN][0])
+                elif self.field[x][y] == 'R':
+                    if self.number_of_players >= 2:
+                        self.players[RED] = [Player(x, y, RED)]
+                        self.field[x][y] = Cell(content=self.players[RED][0])
+                    else:
+                        self.field[x][y] = Cell()
+                elif self.field[x][y] == 'B':
+                    if self.number_of_players >= 3:
+                        self.players[BLUE] = [Player(x, y, BLUE)]
+                        self.field[x][y] = Cell(content=self.players[BLUE][0])
+                    else:
+                        self.field[x][y] = Cell()
+                elif self.field[x][y] == 'Y':
+                    if self.number_of_players >= 4:
+                        self.players[YELLOW] = [Player(x, y, YELLOW)]
+                        self.field[x][y] = Cell(content=self.players[YELLOW][0])
+                    else:
+                        self.field[x][y] = Cell()
                 elif self.field[x][y] == '0':
-                    self.field[x][y] = Cell(content=Item())
+                    self.field[x][y] = Cell(content=Item('money', 0, 0, '', 0))
                 self.field[x][y].render(x, y)
 
     def move(self, direction):
+
+        # Это все не работает. TODO: нормальное передвижение героев
+        return
+
         x, y = self.player.get_pos()
         if direction == 'up':
             if y > 0 and not self.field[y - 1][x].is_blocked():
                 self.player.move(x, y - 1)
+                y -= 1
         elif direction == 'down':
             if y < self.height - 1 and not self.field[y + 1][x].is_blocked():
                 self.player.move(x, y + 1)
+                y += 1
         elif direction == 'left':
             if x > 0 and not self.field[y][x - 1].is_blocked():
                 self.player.move(x - 1, y)
+                x -= 1
         elif direction == 'right':
             if x < self.width - 1 and not self.field[y][x + 1].is_blocked():
                 self.player.move(x + 1, y)
-        # TODO: если player находится на клетке, в которой лежит item (type(cell.content).__name__ == "Item"),
-        #  нужно добавлять этот item в инвентарь и убирать с клетки
+                x += 1
+
+        content = self.field[y][x].get_content()
+        if content is not None:
+            self.player.interact(content)
+            if type(content).__name__ == "Item":
+                self.field[y][x].content = None
+                self.field[y][x].render(y, x)
 
     def get_click(self, mouse_pos):
         cell = self.get_cell(mouse_pos)
@@ -252,9 +281,10 @@ class Meet:  # TODO
 
 
 class Item:
-    def __init__(self, name, d_atc, d_dfc, description, slot, feature=None):
+    def __init__(self, name, d_atc, d_dfc, description, slot, tile_type='coins', feature=None):
         self.name, self.d_atc, self.d_dfc, self.description, self.feature = name, d_atc, d_dfc, description, feature
         self.slot = slot
+        self.tile_type = tile_type
 
     def equip_dequip(self):
         return self.d_atc, self.d_dfc, self.feature
@@ -267,6 +297,12 @@ class Item:
             return True
         return False
 
+    def render(self, x, y):
+        Tile(self.tile_type, x, y)
+
+    def stats(self):  # я хз что она должна возвращать TODO Item.stats()
+        pass
+
 
 class Player(pygame.sprite.Sprite):
     image = load_image('player.png', -1)
@@ -274,7 +310,7 @@ class Player(pygame.sprite.Sprite):
     null_unit = Unit("", 0, 0, 0, 0, 0, 0, 0, "", False)
 
     def __init__(self, pos_y, pos_x, team):
-        super().__init__(players)
+        super().__init__(player_sprites)
         self.team = team
         self.image = pygame.transform.scale(self.image, (tile_width, tile_height))
         self.rect = self.image.get_rect().move(tile_width * pos_x,
@@ -314,21 +350,19 @@ class Player(pygame.sprite.Sprite):
         return False
 
     def interact(self, other):
-        if other.type == 'hero':
+        if type(other).__name__ == 'Hero':
             if other.team != self.team:
                 self.fight(other)
                 return
             if other.team == self.team:
                 self.meet(other)
                 return
-        if other.type == 'item':  # А тут вписать то что будет в этом классе,
+        elif type(other).__name__ == 'Item':  # А тут вписать то что будет в этом классе,
             # который отвечает за предмет лежащий на поле
             self.inventory[self.inventory.index(Player.null_item)] = Item(*other.stats())  # Что-то типа заглушки,
-            # которая превращает предмет, который лежит на полу в предмет, который в инвентаре героя
-            # Короче тупа подбираем
-            other.dispose()
-            # Опять что-то типа заглушки, чтобы предмает исчез с карты. Сорре за это говно TODO * 3
-        if other.type == 'build':
+            # которая превращает предмет, который лежит на полу в предмет, который в инвентаре герояTODO * 3
+
+        elif type(other).__name__ == 'build':
             if other.variety != 'town':  # Опять заглушка
                 d_atc, d_dfc, d_features = other.visit
                 self.atc, self.dfc = self.atc + d_atc, self.dfc + d_dfc
@@ -354,7 +388,7 @@ class Tile(pygame.sprite.Sprite):
     }
 
     def __init__(self, tile_type, pos_y, pos_x):
-        super().__init__(tiles)
+        super().__init__(tile_sprites)
         self.image = pygame.transform.scale(Tile.tile_images[tile_type], (tile_width, tile_height))
         self.rect = self.image.get_rect().move(tile_width * pos_x,
                                                tile_height * pos_y)
@@ -452,21 +486,21 @@ def start_screen():
 
     bwidth, bheight = 400, 80
 
-    start_button = Button(buttons, screen, (WIDTH - bwidth) // 2, (HEIGHT - bheight * 4) // 2,
+    start_button = Button(button_sprites, screen, (WIDTH - bwidth) // 2, (HEIGHT - bheight * 4) // 2,
                           bwidth, bheight)
     start_button.set_background_image('button-background.jpg')
     font = pygame.font.Font(None, 80)
     start_button.set_text("Start", font, pygame.Color(156, 130, 79))
     start_button.render()
 
-    settings_button = Button(buttons, screen, (WIDTH - bwidth) // 2, (HEIGHT - bheight) // 2, bwidth,
+    settings_button = Button(button_sprites, screen, (WIDTH - bwidth) // 2, (HEIGHT - bheight) // 2, bwidth,
                              bheight)
     settings_button.set_background_image('button-background.jpg')
     font = pygame.font.Font(None, 80)
     settings_button.set_text("Settings", font, pygame.Color(156, 130, 79))
     settings_button.render()
 
-    exit_button = Button(buttons, screen, (WIDTH - bwidth) // 2, (HEIGHT + bheight * 2) // 2, bwidth,
+    exit_button = Button(button_sprites, screen, (WIDTH - bwidth) // 2, (HEIGHT + bheight * 2) // 2, bwidth,
                          bheight, terminate)
     exit_button.set_background_image('button-background.jpg')
     font = pygame.font.Font(None, 80)
@@ -480,14 +514,14 @@ def start_screen():
                 terminate()
             if start_button.clicked:
                 return
-            buttons.update(event)
+            button_sprites.update(event)
         pygame.display.flip()
         clock.tick(FPS)
 
 
 start_screen()  # Main menu
 screen.fill(0xff0000)
-field = Field("example.txt")  # Игровое поле
+field = Field("example.txt", N)  # Игровое поле
 
 while running:
     for event in pygame.event.get():
@@ -510,8 +544,8 @@ while running:
                 if x < edge_x and y < edge_y:
                     print(1)
     all_sprites.draw(screen)
-    tiles.draw(field.space)
-    players.draw(field.space)
+    tile_sprites.draw(field.space)
+    player_sprites.draw(field.space)
     screen.blit(field.space, (Field.margin_right, Field.margin_top))
     pygame.display.flip()
     clock.tick(FPS)
