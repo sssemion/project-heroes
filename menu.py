@@ -160,8 +160,118 @@ class Field:  # Игровое поле
         pass
 
 
+# Здесь нужно сделать всё по красоте, чтобы он наследовался от спрайта и рисовался во время битвы,
+# ведь я всего лишь бэкэнд - лох, а ты фронтенд гений!!! TODO
+# Ещё должен быть метод, который зеркалит спрайт юнита (надо тебе же для Fight)
+class Unit:
+    def __init__(self, name, attack, defence, min_dmg, max_dmg, count, speed, hp, team, shoot):
+        self.dead = 0
+        self.counter = True
+        self.top_hp = hp
+        self.team = team
+        self.shoot = shoot
+        self.count, self.name, self.atc, self.dfc, self.min_dmg, self.max_dmg, self.spd, self.hp = \
+            count, name, attack, defence, min_dmg, max_dmg, speed, hp
+        self.cur_atc, self.cur_dfc, self.cur_min_dmg, self.cur_max_dmg, self.cur_spd, self.cur_hp, self.cur_top_hp = \
+            attack, defence, min_dmg, max_dmg, speed, hp, hp
+
+    def attack_rat(self, enemy):
+        damage = random.randint(self.min_dmg, self.max_dmg) * (self.cur_atc / enemy.cur_dfc) * (self.count + 1)
+        enemy.get_rat_damage(damage)
+
+    def attack_hon(self, enemy):
+        damage = random.randint(self.min_dmg, self.max_dmg) * (self.cur_atc / enemy.cur_dfc) * (self.count + 1)
+        if enemy.counter:
+            enemy.get_honest_damage(damage, self)
+        else:
+            enemy.get_rat_damage(damage)
+
+    def get_honest_damage(self, damage, attacker):
+        self.count -= damage // self.hp
+        self.top_hp -= damage % self.hp
+        if self.count >= 0:
+            self.counter = False
+            attacker.get_rat_damage(
+                random.randint(self.min_dmg, self.max_dmg) * (self.cur_atc / attacker.cur_dfc) * (self.count + 1))
+        else:
+            self.dead = 1
+
+    def get_rat_damage(self, damage):
+        self.count -= damage // self.hp
+        self.top_hp -= damage % self.hp
+        if self.count < 0:
+            self.dead = 1
+
+    def hero_bonus(self, hero):
+        d_atc, d_dfc, d_features = hero.atc, hero.dfc, hero.bonus
+        self.cur_atc, self.cur_dfc, self.hp, self.cur_spd, self.cur_top_hp = \
+            self.cur_atc + d_atc, self.cur_dfc + d_dfc, self.hp + d_features['d_hp'], \
+            self.cur_spd + d_features['d_spd'], self.cur_top_hp + d_features['d_hp']
+
+    def __lt__(self, other):
+        if self.spd < other.spd:
+            return True
+        return False
+
+    def __le__(self, other):
+        if self.spd <= other.spd:
+            return True
+        return False
+
+    def __gt__(self, other):
+        if self.spd > other.spd:
+            return True
+        return False
+
+    def __ge__(self, other):
+        if self.spd >= other.spd:
+            return True
+        return False
+
+
+class Fight:  # TODO
+    coor_row = [0, 1, 3, 4, 5, 7, 8]
+    null_unit = Unit("", 0, 0, 0, 0, 0, 0, 0, "", False)
+
+    def __init__(self, left_hero, right_hero):
+        self.board = [[0] for _ in range(10)] * 9
+        self.turn_queue = left_hero.army + right_hero.army
+
+        for num in range(len(left_hero.army)):
+            if left_hero.army[num] != Fight.null_unit:
+                self.board[Fight.coor_row[num]][0] = left_hero.army[num]
+
+        for num in range(len(right_hero.army)):
+            if right_hero.army[num] != Fight.null_unit:
+                self.board[Fight.coor_row[num]][9] = right_hero.army[num]
+
+
+class Meet:  # TODO
+    def __init__(self, left_hero, right_hero):
+        pass
+
+
+class Item:
+    def __init__(self, name, d_atc, d_dfc, description, slot, feature=None):
+        self.name, self.d_atc, self.d_dfc, self.description, self.feature = name, d_atc, d_dfc, description, feature
+        self.slot = slot
+
+    def equip_dequip(self):
+        return self.d_atc, self.d_dfc, self.feature
+
+    def get_description(self):
+        return self.description
+
+    def __eq__(self, other):
+        if self.name == other.name and self.d_atc == other.d_atc and self.d_dfc == other.d_dfc and self.description == other.description and self.feature == other.feature:
+            return True
+        return False
+
+
 class Player(pygame.sprite.Sprite):
     image = load_image('player.png', -1)
+    null_item = Item("", 0, 0, "all", "")
+    null_unit = Unit("", 0, 0, 0, 0, 0, 0, 0, "", False)
 
     def __init__(self, pos_y, pos_x, team):
         super().__init__(players)
@@ -170,6 +280,14 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.image.get_rect().move(tile_width * pos_x,
                                                tile_height * pos_y)
         self.pos = pos_x, pos_y
+        self.type = 'hero'
+        self.team = team
+        self.atc, self.dfc = 0, 0
+        self.xp, self.next_level = 0, 1000
+        self.inventory = [Player.null_item] * 30
+        self.equiped_items = [Player.null_item] * 10
+        self.bonus = {'anti_tax': 0, 'd_hp': 0, 'bonus_move': 0, 'd_spd': 0}
+        self.army = [Player.null_unit] * 7
 
     def move(self, x, y):
         self.pos = x, y
@@ -178,6 +296,54 @@ class Player(pygame.sprite.Sprite):
 
     def get_pos(self):
         return self.pos
+
+    def swap_item(self, other, slot):
+        if (self.equiped_items[slot].slot == other.slot) or self.equiped_items[slot] == \
+                Player.null_item or other == Player.null_item:
+            d_atc, d_dfc, d_feat = self.equiped_items[slot].equip_dequip()
+            self.atc, self.dfc = self.atc - d_atc, self.dfc - d_dfc
+            for key, val in d_feat.items():
+                self.bonus[key] -= val
+            self.equiped_items[slot], self.inventory[self.inventory.index(Player.null_item)] = \
+                other, self.equiped_items[slot]
+            d_atc, d_dfc, d_feat = self.equiped_items[slot].equip_dequip()
+            self.atc, self.dfc = self.atc + d_atc, self.dfc + d_dfc
+            for key, val in d_feat.items():
+                self.bonus[key] += val
+            return True
+        return False
+
+    def interact(self, other):
+        if other.type == 'hero':
+            if other.team != self.team:
+                self.fight(other)
+                return
+            if other.team == self.team:
+                self.meet(other)
+                return
+        if other.type == 'item':  # А тут вписать то что будет в этом классе,
+            # который отвечает за предмет лежащий на поле
+            self.inventory[self.inventory.index(Player.null_item)] = Item(*other.stats())  # Что-то типа заглушки,
+            # которая превращает предмет, который лежит на полу в предмет, который в инвентаре героя
+            # Короче тупа подбираем
+            other.dispose()
+            # Опять что-то типа заглушки, чтобы предмает исчез с карты. Сорре за это говно TODO * 3
+        if other.type == 'build':
+            if other.variety != 'town':  # Опять заглушка
+                d_atc, d_dfc, d_features = other.visit
+                self.atc, self.dfc = self.atc + d_atc, self.dfc + d_dfc
+                for key, val in d_features.items():
+                    self.bonus[key] += val
+
+    # Два метода заглушки, которые ещё рано реализовывать, так как на карте даже двух героев то нет,
+    # а тут их взаимодействия и эт фронт уже (твоя работа), так что я иду нахуй Соре
+    # Тут наверно придется класс Fight писать TODO * 2
+    def fight(self, other):
+        Fight(self, other)
+        pass
+
+    def meet(self, other):
+        pass
 
 
 class Tile(pygame.sprite.Sprite):
@@ -268,81 +434,6 @@ class Button(pygame.sprite.Sprite):
         self.surface.blit(self.image, (self.x, self.y))
 
 
-# Здесь нужно сделать всё по красоте, чтобы он наследовался от спрайта и рисовался во время битвы,
-# ведь я всего лишь бэкэнд - лох, а ты фронтенд гений!!! TODO
-class Unit(pygame.sprite.Sprite):
-    def __init__(self, pos_x, pos_y, name, attack, defence, min_dmg, max_dmg, count, speed, hp, town,
-                 image="Player.png"):
-        super().__init__(units)
-        self.dead = 0
-        self.counter = True
-        self.top_hp = hp
-        self.town = town
-        self.count, self.name, self.atc, self.dfc, self.min_dmg, self.max_dmg, self.spd, self.hp = \
-            count, name, attack, defence, min_dmg, max_dmg, speed, hp
-        self.image = pygame.transform.scale(load_image(image, -1), (tile_width, tile_height))
-        self.pos = pos_x, pos_y
-        # self.rect = self.image.get_rect().move(tile_width * pos_x, tile_height * pos_y)
-
-    def get_pos(self):
-        return self.pos
-
-    def update(self):
-        pass
-
-    def set_image(self, filename):
-        self.image = pygame.transform.scale(load_image(filename, -1), (tile_width, tile_height))
-        pos_x, pos_y = self.get_pos()
-        # self.rect = self.image.get_rect().move(tile_width * pos_x, tile_height * pos_y)
-
-    def attack_rat(self, enemy):  # Атаковать "по-крысиному" (не получать ответный урон)
-        damage = random.randint(self.min_dmg, self.max_dmg) * (self.atc / enemy.dfc) * (self.count + 1)
-        enemy.get_rat_damage(damage)
-
-    def attack_hon(self, enemy):  # Атаковать честно (получить ответный урон)
-        damage = random.randint(self.min_dmg, self.max_dmg) * (self.atc / enemy.dfc) * (self.count + 1)
-        if enemy.counter:
-            enemy.get_honest_damage(damage, self)
-        else:
-            enemy.get_rat_damage(damage)
-
-    def get_honest_damage(self, damage, attacker):  # Получить честный урон (и дать ответный)
-        self.count -= damage // self.hp
-        self.top_hp -= damage % self.hp
-        if self.count >= 0:
-            self.counter = False
-            attacker.get_rat_damage(
-                random.randint(self.min_dmg, self.max_dmg) * (self.atc / attacker.dfc) * (self.count + 1))
-        else:
-            self.dead = 1
-
-    def get_rat_damage(self, damage):  # Получить безответный урон
-        self.count -= damage // self.hp
-        self.top_hp -= damage % self.hp
-        if self.count < 0:
-            self.dead = 1
-
-    def __lt__(self, other):  # <
-        if self.spd < other.spd:
-            return True
-        return False
-
-    def __le__(self, other):  # <=
-        if self.spd <= other.spd:
-            return True
-        return False
-
-    def __gt__(self, other):  # >
-        if self.spd > other.spd:
-            return True
-        return False
-
-    def __ge__(self, other):  # >=
-        if self.spd >= other.spd:
-            return True
-        return False
-
-
 def start_screen():
     intro_text = []
 
@@ -397,8 +488,6 @@ def start_screen():
 start_screen()  # Main menu
 screen.fill(0xff0000)
 field = Field("example.txt")  # Игровое поле
-
-devil = Unit(0, 0, 'devil', 10, 10, 5, 15, 2, 5, 100, 'Town', 'devil.png')
 
 while running:
     for event in pygame.event.get():
