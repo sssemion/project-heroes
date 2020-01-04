@@ -5,7 +5,7 @@ import random
 
 GREEN, RED, BLUE, YELLOW = 'green', 'red', 'blue', 'yellow'
 
-N = int(input())  # tmp
+N = 4  # int(input())  # tmp
 
 pygame.init()
 screen_info = pygame.display.Info()
@@ -258,21 +258,60 @@ class Unit:
         return False
 
 
-class Fight:  # TODO
+def fight(left_hero, right_hero):  # TODO
     coor_row = [0, 1, 3, 4, 5, 7, 8]
     null_unit = Unit("", 0, 0, 0, 0, 0, 0, 0, "", False)
+    board = [[0] * 10 for _ in range(9)]
+    turn_queue = left_hero.army + right_hero.army
 
-    def __init__(self, left_hero, right_hero):
-        self.board = [[0] for _ in range(10)] * 9
-        self.turn_queue = left_hero.army + right_hero.army
+    for num in range(len(left_hero.army)):
+        if left_hero.army[num] != null_unit:
+            board[coor_row[num]][0] = left_hero.army[num]
 
-        for num in range(len(left_hero.army)):
-            if left_hero.army[num] != Fight.null_unit:
-                self.board[Fight.coor_row[num]][0] = left_hero.army[num]
+    for num in range(len(right_hero.army)):
+        if right_hero.army[num] != null_unit:
+            board[coor_row[num]][9] = right_hero.army[num]
 
-        for num in range(len(right_hero.army)):
-            if right_hero.army[num] != Fight.null_unit:
-                self.board[Fight.coor_row[num]][9] = right_hero.army[num]
+    # Сохраняем основной экран и затемняем его
+    global screen_save
+    screen_save = screen
+    black = pygame.Surface((WIDTH, HEIGHT))
+    black.fill(pygame.color.Color(0, 0, 0))
+    black.set_alpha(200)
+    screen.blit(black, (0, 0))
+
+    # Создаем экран боя
+    width, height = 800, 556
+    fight_surface = pygame.Surface((width, height))
+    fight_surface.blit(pygame.transform.scale(load_image('fight-background.jpg'), (width, height)), (0, 0))
+
+    # Чертим клеточки
+    margin_top = 125
+    margin_right = margin_left = 50
+    margin_bottom = 25
+    rows, cols = len(board), len(board[0])
+    cell_width = (width - margin_left - margin_right) // cols
+    cell_height = (height - margin_top - margin_bottom) // rows
+    cells_surface = pygame.Surface((width - margin_left - margin_right + 2, height - margin_top - margin_bottom + 2))
+    for i in range(rows + 1):
+        pygame.draw.line(cells_surface, 0xffffff, (0, i * cell_height),
+                         (width - margin_right - margin_left, i * cell_height), 2)
+    for i in range(cols + 1):
+        pygame.draw.line(cells_surface, 0xffffff, (i * cell_width, 0),
+                         (i * cell_width, height - margin_top - margin_bottom), 2)
+    cells_surface.set_colorkey(0x000000)
+    cells_surface.set_alpha(128)
+    fight_surface.blit(cells_surface, (margin_right, margin_top))
+
+    screen.blit(fight_surface, ((WIDTH - width) // 2, (HEIGHT - height) // 2))
+
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+        pygame.display.flip()
+        clock.tick(FPS)
 
 
 class Meet:  # TODO
@@ -370,7 +409,7 @@ class Player(pygame.sprite.Sprite):
                     self.bonus[key] += val
 
     # Два метода заглушки, которые ещё рано реализовывать, так как на карте даже двух героев то нет,
-    # а тут их взаимодействия и эт фронт уже (твоя работа), так что я иду нахуй Соре
+    # а тут их взаимодействия и эт фронт уже (твоя работа), так что я иду нафиг Соре
     # Тут наверно придется класс Fight писать TODO * 2
     def fight(self, other):
         Fight(self, other)
@@ -378,6 +417,13 @@ class Player(pygame.sprite.Sprite):
 
     def meet(self, other):
         pass
+
+    def render(self, *args):  # рисует кружочек возле героя чтобы различать разные команды
+        x, y = self.get_pos()
+        pygame.draw.ellipse(self.image, pygame.color.Color(self.team), pygame.Rect(int(tile_width * 0.35),
+                                                                                   int(tile_height * 0.75),
+                                                                                   int(tile_width * 0.3),
+                                                                                   int(tile_height * 0.2)))
 
 
 class Tile(pygame.sprite.Sprite):
@@ -469,20 +515,8 @@ class Button(pygame.sprite.Sprite):
 
 
 def start_screen():
-    intro_text = []
-
     fon = pygame.transform.scale(load_image('background.jpg'), (WIDTH, HEIGHT))
     screen.blit(fon, (0, 0))
-    font = pygame.font.Font(None, 30)
-    text_coord = 50
-    for line in intro_text:
-        string_rendered = font.render(line, 1, pygame.Color('black'))
-        intro_rect = string_rendered.get_rect()
-        text_coord += 10
-        intro_rect.top = text_coord
-        intro_rect.x = 10
-        text_coord += intro_rect.height
-        screen.blit(string_rendered, intro_rect)
 
     bwidth, bheight = 400, 80
 
@@ -490,21 +524,21 @@ def start_screen():
                           bwidth, bheight)
     start_button.set_background_image('button-background.jpg')
     font = pygame.font.Font(None, 80)
-    start_button.set_text("Start", font, pygame.Color(156, 130, 79))
+    start_button.set_text("Start", font, pygame.color.Color(156, 130, 79))
     start_button.render()
 
     settings_button = Button(button_sprites, screen, (WIDTH - bwidth) // 2, (HEIGHT - bheight) // 2, bwidth,
                              bheight)
     settings_button.set_background_image('button-background.jpg')
     font = pygame.font.Font(None, 80)
-    settings_button.set_text("Settings", font, pygame.Color(156, 130, 79))
+    settings_button.set_text("Settings", font, pygame.color.Color(156, 130, 79))
     settings_button.render()
 
     exit_button = Button(button_sprites, screen, (WIDTH - bwidth) // 2, (HEIGHT + bheight * 2) // 2, bwidth,
                          bheight, terminate)
     exit_button.set_background_image('button-background.jpg')
     font = pygame.font.Font(None, 80)
-    exit_button.set_text("Exit", font, pygame.Color(32, 32, 32))
+    exit_button.set_text("Exit", font, pygame.color.Color(32, 32, 32))
     exit_button.render()
 
     while True:
@@ -537,6 +571,8 @@ while running:
                 field.move('left')
             if event.key == pygame.K_RIGHT:
                 field.move('right')
+            if event.key == pygame.K_f:
+                fight(field.players[GREEN][0], field.players[BLUE][0])
         elif event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:
                 edge_x, edge_y = field.size_in_pixels
