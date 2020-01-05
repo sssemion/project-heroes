@@ -1,11 +1,14 @@
-import pygame
 import os
-import sys
 import random
+import sys
+import networkx
+import pygame
 
 GREEN, RED, BLUE, YELLOW = 'green', 'red', 'blue', 'yellow'
-
-N = int(input())  # tmp
+selected_hero, current_color = None, GREEN
+sel_her_row, sel_her_col = None, None
+last_row, last_col = -1, -1
+N = 1  # tmp
 
 pygame.init()
 screen_info = pygame.display.Info()
@@ -52,7 +55,7 @@ class Block:  # Предмет, блокирующий проход
 
 
 class Cell:  # Ячейка поля Field
-    def __init__(self, cost=0, tile_type='grass', content=None):
+    def __init__(self, cost=100, tile_type='grass', content=None):
         self.cost = cost  # cost - стоимость передвижения по клетке
         self.tile_type = tile_type
         self.content = content  # content - содержимое ячейки (None, экземпляр класса Block или любой другой объект)
@@ -90,6 +93,7 @@ class Field:  # Игровое поле
     margin_bottom = int(16 / 732 * size_in_pixels[1])
 
     def __init__(self, filename, number_of_players=1):
+        self.Dg = networkx.DiGraph()
         filename = "data/maps/" + filename
         with open(filename, 'r') as mapFile:
             level_map = [line.strip() for line in mapFile]
@@ -103,6 +107,49 @@ class Field:  # Игровое поле
         self.number_of_players = number_of_players
 
         self.render()
+        self.graph()
+        print(help(self.Dg.add_edge))
+
+    def possible_turns(self, WantRow, WantColumn):
+        if WantRow == self.height - 1 and WantColumn == self.width - 1:
+            return [[0, -1], [-1, -1], [-1, 0]]
+
+        if self.height - 1 > WantRow > 0 and self.width - 1 > WantColumn > 0:
+            return [[0, 1], [1, 1], [1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1]]
+
+        if self.height - 1 > WantRow > 0 and WantColumn == 0:
+            return [[-1, 0], [-1, 1], [0, 1], [1, 1], [1, 0]]
+
+        if 0 < WantRow < self.height - 1 and WantColumn == self.width - 1:
+            return [[-1, 0], [-1, -1], [0, -1], [1, -1], [1, 0]]
+
+        if self.width - 1 > WantColumn > 0 and WantRow == 0:
+            return [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1]]
+
+        if 0 < WantColumn < self.width - 1 and self.height - 1 == WantRow:
+            return [[0, -1], [-1, -1], [-1, 0], [-1, 1], [0, 1]]
+
+        if WantRow == 0 and WantColumn == 0:
+            return [[0, 1], [1, 1], [1, 0]]
+
+        if WantRow == 0 and WantColumn == self.width - 1:
+            return [[0, -1], [1, -1], [1, 0]]
+
+        if WantRow == self.height - 1 and WantColumn == 0:
+            return [[-1, 0], [-1, 1], [0, 1]]
+
+    def graph(self):
+        for row in range(self.height):
+            for col in range(self.width):
+                if self.field[row][col].content is None or type(self.field[row][col].content).__name__ == 'Player':
+                    posibilities = self.possible_turns(row, col)
+                    for turn in posibilities:
+                        if self.field[row + turn[0]][col + turn[1]].content is None:
+                            if turn[0] and turn[1]:
+                                pass
+                            else:
+                                self.Dg.add_edge(str(row) + ',' + str(col),
+                                                 str(row + turn[0]) + ',' + str(col + turn[1]))
 
     def render(self):
         self.frame = pygame.transform.scale(load_image('frame.png'), Field.size_in_pixels)
@@ -174,19 +221,42 @@ class Field:  # Игровое поле
                 self.field[y][x].content = None
                 self.field[y][x].render(y, x)
 
-    def get_click(self, mouse_pos):
-        cell = self.get_cell(mouse_pos)
+    def get_click(self, event):
+        cell = self.get_cell(event.pos)
+
         if cell is not None:
-            self.on_click(cell)
+            self.on_click(cell, event.button)
 
     def get_cell(self, mouse_pos):
         if not (Field.margin_left <= mouse_pos[0] <= Field.margin_left + self.width * tile_width) or not (
-                Field.margin_top <= mouse_pos[1] <= Field.margin_top + self.height * tile_height):
+                Field.margin_top <= mouse_pos[1] <= Field.margin_top + self.height * tile_height) or not (
+                mouse_pos[0] < Field.size_in_pixels[0] and mouse_pos[1] < Field.size_in_pixels[1]):
             return None
-        return (mouse_pos[1] - Field.margin_top) // tile_height, (mouse_pos[0] - Field.margin_left) // tile_width
+        return (mouse_pos[1] - Field.margin_top) // tile_height, (
+                mouse_pos[0] - Field.margin_left) // tile_width  # row col
 
-    def on_click(self, cell_coords):
-        pass
+    def on_click(self, cell, action):
+        global sel_her_col, sel_her_row, last_row, last_col, selected_hero
+        if action == 1 and selected_hero is not None:
+            if last_col == cell[1] and last_row == cell[0]:
+                try:
+                    print(
+                        networkx.shortest_path(self.Dg, str(sel_her_row) + ',' + str(sel_her_col),
+                                               str(last_row) + ',' + str(last_col), weight=1))
+                    for row in range(-1,2,2):
+                        for col in range(-1,2,2):
+                            self.Dg.remove_edge()
+
+
+                except:
+                    pass
+            else:
+                last_row, last_col = cell[0], cell[1]
+        elif action == 3:
+            if type(self.field[cell[0]][cell[1]].content).__name__ == 'Player':
+                sel_her_row, sel_her_col = cell[0], cell[1]
+                selected_hero = self.field[cell[0]][cell[1]].content
+        # print(sel_her_row, sel_her_col, last_row, last_col)
 
 
 # Здесь нужно сделать всё по красоте, чтобы он наследовался от спрайта и рисовался во время битвы,
@@ -324,6 +394,7 @@ class Player(pygame.sprite.Sprite):
         self.equiped_items = [Player.null_item] * 10
         self.bonus = {'anti_tax': 0, 'd_hp': 0, 'bonus_move': 0, 'd_spd': 0}
         self.army = [Player.null_unit] * 7
+        self.movepoints = 2000
 
     def move(self, x, y):
         self.pos = x, y
@@ -538,11 +609,8 @@ while running:
             if event.key == pygame.K_RIGHT:
                 field.move('right')
         elif event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1:
-                edge_x, edge_y = field.size_in_pixels
-                x, y = event.pos
-                if x < edge_x and y < edge_y:
-                    print(1)
+            if event.button == 1 or event.button == 3:
+                field.get_click(event)
     all_sprites.draw(screen)
     tile_sprites.draw(field.space)
     player_sprites.draw(field.space)
