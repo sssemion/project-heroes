@@ -189,11 +189,10 @@ class Field:  # Игровое поле
         pass
 
 
-# Здесь нужно сделать всё по красоте, чтобы он наследовался от спрайта и рисовался во время битвы,
-# ведь я всего лишь бэкэнд - лох, а ты фронтенд гений!!! TODO
-# Ещё должен быть метод, который зеркалит спрайт юнита (надо тебе же для Fight)
-class Unit:
-    def __init__(self, name, attack, defence, min_dmg, max_dmg, count, speed, hp, team, shoot):
+class Unit(pygame.sprite.Sprite):
+    def __init__(self, image, name, attack, defence, min_dmg, max_dmg, count, speed, hp, team, shoot):
+        super().__init__(unit_sprites)
+        self.image = load_image(image)
         self.dead = 0
         self.counter = True
         self.top_hp = hp
@@ -237,6 +236,15 @@ class Unit:
             self.cur_atc + d_atc, self.cur_dfc + d_dfc, self.hp + d_features['d_hp'], \
             self.cur_spd + d_features['d_spd'], self.cur_top_hp + d_features['d_hp']
 
+    def update(self, updating_type='', *args):
+        if updating_type:
+            if updating_type == 'adjust-size':
+                width, height = args
+                self.image = pygame.transform.scale(self.image, (width, height))
+            # ... other types
+            else:
+                raise Exception(f'incorrect updating_type: {updating_type}')
+
     def __lt__(self, other):
         if self.spd < other.spd:
             return True
@@ -258,9 +266,95 @@ class Unit:
         return False
 
 
+class FightBoard:
+    margin_top = 125
+    margin_right = margin_left = 50
+    margin_bottom = 25
+
+    def __init__(self, board, width, height):
+        self.board = board
+        self.width = width
+        self.height = height
+        self.rows = self.cols = 0
+        self.cell_width = self.cell_height = 0
+        self.surface = pygame.Surface((width, height))
+        self.surface.blit(pygame.transform.scale(load_image('fight-background.jpg'), (width, height)), (0, 0))
+
+    def draw_cells(self):
+        self.rows = len(self.board)
+        self.cols = len(self.board[0])
+        self.cell_width = (self.width - FightBoard.margin_left - FightBoard.margin_right) // self.cols
+        self.cell_height = (self.height - FightBoard.margin_top - FightBoard.margin_bottom) // self.rows
+        cells_surface = pygame.Surface((self.width - FightBoard.margin_left - FightBoard.margin_right + 2,
+                                        self.height - FightBoard.margin_top - FightBoard.margin_bottom + 2))
+        for i in range(self.rows + 1):
+            pygame.draw.line(cells_surface, 0xffffff, (0, i * self.cell_height),
+                             (self.width - FightBoard.margin_right - FightBoard.margin_left, i * self.cell_height), 2)
+        for i in range(self.cols + 1):
+            pygame.draw.line(cells_surface, 0xffffff, (i * self.cell_width, 0),
+                             (i * self.cell_width, self.height - FightBoard.margin_top - FightBoard.margin_bottom), 2)
+        cells_surface.set_colorkey(0x000000)
+        cells_surface.set_alpha(128)
+        self.surface.blit(cells_surface, (FightBoard.margin_right, FightBoard.margin_top))
+
+    def get_click(self, mouse_pos):
+        cell = self.get_cell(mouse_pos)
+        self.on_click(cell)
+
+    def get_cell(self, mouse_pos):
+        if not (FightBoard.margin_left <= mouse_pos[
+            0] <= FightBoard.margin_left + self.width * self.cell_width) or not (
+                FightBoard.margin_top <= mouse_pos[1] <= FightBoard.margin_top + self.height * self.cell_height):
+            return None
+        return (mouse_pos[1] - FightBoard.margin_top) // self.cell_height, (
+                mouse_pos[0] - FightBoard.margin_left) // self.cell_width
+
+    def on_click(self, cell):
+        pass
+
+
+class HeroFightScreen:
+    width, height = 125, 300
+    font = pygame.font.Font('data/HoMMFontCyr.ttf', 16)
+
+    def __init__(self, hero, right=False):
+        self.surface = pygame.Surface((HeroFightScreen.width, HeroFightScreen.height))
+        self.surface.blit(pygame.transform.scale(load_image('fight-hero-background.jpg'),
+                                                 (HeroFightScreen.width, HeroFightScreen.height)), (0, 0))
+        self.hero = hero
+        self.right = right
+        self.img_height = 0
+
+    def draw_image(self):
+        img = self.hero.original_image
+        if self.right:
+            img = pygame.transform.flip(img, True, False)
+        w, h = img.get_size()
+        h = (h * (HeroFightScreen.width - 10)) // w
+        w = HeroFightScreen.width - 10
+        self.img_height = h
+        self.surface.blit(pygame.transform.scale(img, (w, h)), (5, 5))
+
+    def draw_text(self):
+        atc, dfc = self.hero.get_characteristics()
+        text = [
+            f'Атака: {atc}',
+            f'Защита: {dfc}',
+        ]
+        text_coord = self.img_height + 10
+        for line in text:
+            string = HeroFightScreen.font.render(line, 1, pygame.color.Color(156, 130, 79))
+            string_rect = string.get_rect()
+            text_coord += 5
+            string_rect.top = text_coord
+            string_rect.x = 10
+            text_coord += string_rect.height
+            self.surface.blit(string, string_rect)
+
+
 def fight(left_hero, right_hero):  # TODO
     coor_row = [0, 1, 3, 4, 5, 7, 8]
-    null_unit = Unit("", 0, 0, 0, 0, 0, 0, 0, "", False)
+    null_unit = Unit("player.png", "", 0, 0, 0, 0, 0, 0, 0, "", False)
     board = [[0] * 10 for _ in range(9)]
     turn_queue = left_hero.army + right_hero.army
 
@@ -273,8 +367,7 @@ def fight(left_hero, right_hero):  # TODO
             board[coor_row[num]][9] = right_hero.army[num]
 
     # Сохраняем основной экран и затемняем его
-    global screen_save
-    screen_save = screen
+    screen_save = screen.copy()
     black = pygame.Surface((WIDTH, HEIGHT))
     black.fill(pygame.color.Color(0, 0, 0))
     black.set_alpha(200)
@@ -282,34 +375,38 @@ def fight(left_hero, right_hero):  # TODO
 
     # Создаем экран боя
     width, height = 800, 556
-    fight_surface = pygame.Surface((width, height))
-    fight_surface.blit(pygame.transform.scale(load_image('fight-background.jpg'), (width, height)), (0, 0))
+    topleft_coord = ((WIDTH - width) // 2, (HEIGHT - height) // 2)
+    fight_board = FightBoard(board, width, height)
 
     # Чертим клеточки
-    margin_top = 125
-    margin_right = margin_left = 50
-    margin_bottom = 25
-    rows, cols = len(board), len(board[0])
-    cell_width = (width - margin_left - margin_right) // cols
-    cell_height = (height - margin_top - margin_bottom) // rows
-    cells_surface = pygame.Surface((width - margin_left - margin_right + 2, height - margin_top - margin_bottom + 2))
-    for i in range(rows + 1):
-        pygame.draw.line(cells_surface, 0xffffff, (0, i * cell_height),
-                         (width - margin_right - margin_left, i * cell_height), 2)
-    for i in range(cols + 1):
-        pygame.draw.line(cells_surface, 0xffffff, (i * cell_width, 0),
-                         (i * cell_width, height - margin_top - margin_bottom), 2)
-    cells_surface.set_colorkey(0x000000)
-    cells_surface.set_alpha(128)
-    fight_surface.blit(cells_surface, (margin_right, margin_top))
+    fight_board.draw_cells()
 
-    screen.blit(fight_surface, ((WIDTH - width) // 2, (HEIGHT - height) // 2))
+    # Создаем экраны героев
+    left_hero_screen = HeroFightScreen(left_hero)
+    left_hero_screen.draw_image()
+    left_hero_screen.draw_text()
+    screen.blit(left_hero_screen.surface, (topleft_coord[0] - HeroFightScreen.width - 5, topleft_coord[1]))
 
+    right_hero_screen = HeroFightScreen(right_hero, right=True)
+    right_hero_screen.draw_image()
+    right_hero_screen.draw_text()
+    screen.blit(right_hero_screen.surface, (topleft_coord[0] + width + 5, topleft_coord[1]))
+
+    screen.blit(fight_board.surface, topleft_coord)
 
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 terminate()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    screen.blit(screen_save, (0, 0))
+                    return
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                x, y = pygame.mouse.get_pos()
+                x -= topleft_coord[0]
+                y -= topleft_coord[1]
+                fight_board.get_click((x, y))
         pygame.display.flip()
         clock.tick(FPS)
 
@@ -346,12 +443,13 @@ class Item:
 class Player(pygame.sprite.Sprite):
     image = load_image('player.png', -1)
     null_item = Item("", 0, 0, "all", "")
-    null_unit = Unit("", 0, 0, 0, 0, 0, 0, 0, "", False)
+    null_unit = Unit("player.png", "", 0, 0, 0, 0, 0, 0, 0, "", False)
 
     def __init__(self, pos_y, pos_x, team):
         super().__init__(player_sprites)
         self.team = team
         self.image = pygame.transform.scale(self.image, (tile_width, tile_height))
+        self.original_image = self.image.copy()
         self.rect = self.image.get_rect().move(tile_width * pos_x,
                                                tile_height * pos_y)
         self.pos = pos_x, pos_y
@@ -408,11 +506,13 @@ class Player(pygame.sprite.Sprite):
                 for key, val in d_features.items():
                     self.bonus[key] += val
 
+    def get_characteristics(self):
+        return self.atc, self.dfc
+
     # Два метода заглушки, которые ещё рано реализовывать, так как на карте даже двух героев то нет,
     # а тут их взаимодействия и эт фронт уже (твоя работа), так что я иду нафиг Соре
     # Тут наверно придется класс Fight писать TODO * 2
     def fight(self, other):
-        Fight(self, other)
         pass
 
     def meet(self, other):
@@ -520,24 +620,23 @@ def start_screen():
 
     bwidth, bheight = 400, 80
 
+    font = pygame.font.Font(None, 80)
+
     start_button = Button(button_sprites, screen, (WIDTH - bwidth) // 2, (HEIGHT - bheight * 4) // 2,
                           bwidth, bheight)
     start_button.set_background_image('button-background.jpg')
-    font = pygame.font.Font(None, 80)
     start_button.set_text("Start", font, pygame.color.Color(156, 130, 79))
     start_button.render()
 
     settings_button = Button(button_sprites, screen, (WIDTH - bwidth) // 2, (HEIGHT - bheight) // 2, bwidth,
                              bheight)
     settings_button.set_background_image('button-background.jpg')
-    font = pygame.font.Font(None, 80)
     settings_button.set_text("Settings", font, pygame.color.Color(156, 130, 79))
     settings_button.render()
 
     exit_button = Button(button_sprites, screen, (WIDTH - bwidth) // 2, (HEIGHT + bheight * 2) // 2, bwidth,
                          bheight, terminate)
     exit_button.set_background_image('button-background.jpg')
-    font = pygame.font.Font(None, 80)
     exit_button.set_text("Exit", font, pygame.color.Color(32, 32, 32))
     exit_button.render()
 
@@ -546,7 +645,7 @@ def start_screen():
             if event.type == pygame.QUIT or (
                     event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                 terminate()
-            if start_button.clicked:
+            if start_button.clicked or (event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN):
                 return
             button_sprites.update(event)
         pygame.display.flip()
