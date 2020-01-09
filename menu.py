@@ -1,6 +1,9 @@
+import itertools
 import os
 import random
 import sys
+import traceback
+
 import networkx
 import pygame
 
@@ -44,6 +47,7 @@ button_sprites = pygame.sprite.Group()
 tile_sprites = pygame.sprite.Group()
 player_sprites = pygame.sprite.Group()
 unit_sprites = pygame.sprite.Group()
+arrow_sprites = pygame.sprite.Group()
 
 
 class Block:  # Предмет, блокирующий проход
@@ -108,7 +112,6 @@ class Field:  # Игровое поле
 
         self.render()
         self.graph()
-        print(help(self.Dg.add_edge))
 
     def possible_turns(self, WantRow, WantColumn):
         if WantRow == self.height - 1 and WantColumn == self.width - 1:
@@ -141,7 +144,8 @@ class Field:  # Игровое поле
     def graph(self):
         for row in range(self.height):
             for col in range(self.width):
-                if self.field[row][col].content is None or type(self.field[row][col].content).__name__ == 'Player':
+                if self.field[row][col].content is None or type(
+                        self.field[row][col].content).__name__ == 'Player':
                     posibilities = self.possible_turns(row, col)
                     for turn in posibilities:
                         if self.field[row + turn[0]][col + turn[1]].content is None:
@@ -228,8 +232,10 @@ class Field:  # Игровое поле
             self.on_click(cell, event.button)
 
     def get_cell(self, mouse_pos):
-        if not (Field.margin_left <= mouse_pos[0] <= Field.margin_left + self.width * tile_width) or not (
-                Field.margin_top <= mouse_pos[1] <= Field.margin_top + self.height * tile_height) or not (
+        if not (Field.margin_left <= mouse_pos[
+            0] <= Field.margin_left + self.width * tile_width) or not (
+                Field.margin_top <= mouse_pos[
+            1] <= Field.margin_top + self.height * tile_height) or not (
                 mouse_pos[0] < Field.size_in_pixels[0] and mouse_pos[1] < Field.size_in_pixels[1]):
             return None
         return (mouse_pos[1] - Field.margin_top) // tile_height, (
@@ -238,24 +244,64 @@ class Field:  # Игровое поле
     def on_click(self, cell, action):
         global sel_her_col, sel_her_row, last_row, last_col, selected_hero
         if action == 1 and selected_hero is not None:
-            if last_col == cell[1] and last_row == cell[0]:
-                try:
-                    print(
-                        networkx.shortest_path(self.Dg, str(sel_her_row) + ',' + str(sel_her_col),
-                                               str(last_row) + ',' + str(last_col), weight=1))
-                    for row in range(-1,2,2):
-                        for col in range(-1,2,2):
-                            self.Dg.remove_edge()
-
-
-                except:
-                    pass
+            path = []
+            if (last_row, last_col) == cell:
+                # Убираем стрелочки
+                arrow_sprites.empty()
+                # TODO: Анимация передвижения героев (путь строится, стрелочки рисуются)
             else:
-                last_row, last_col = cell[0], cell[1]
+                # Убираем старые стрелочки
+                arrow_sprites.empty()
+                # Рисуем стрелочки
+                last_row, last_col = cell
+                path = networkx.shortest_path(self.Dg, str(sel_her_row) + ',' + str(sel_her_col),
+                                              str(last_row) + ',' + str(last_col), weight=1)
+                path = list(map(lambda x: list(map(int, x.split(','))), path))
+                for i, (row, col) in enumerate(path[1:-1], 1):
+                    prev_row, prev_col = path[i - 1]
+                    next_row, next_col = path[i + 1]
+                    # Определяем направление стрелочки
+                    if prev_row == next_row:
+                        if prev_col < next_col:
+                            direction = "right"
+                        else:
+                            direction = "left"
+                    elif prev_col == next_col:
+                        if prev_row < next_row:
+                            direction = "down"
+                        else:
+                            direction = "top"
+                    elif prev_row < next_row:
+                        if next_row == row:
+                            if prev_col < next_col:
+                                direction = "top-to-right"
+                            elif prev_col > next_col:
+                                direction = "top-to-left"
+                        elif next_col == col:
+                            if prev_col < next_col:
+                                direction = "left-to-down"
+                            if prev_col > next_col:
+                                direction = "right-to-down"
+                    else:
+                        if next_row == row:
+                            if prev_col < next_col:
+                                direction = "down-to-right"
+                            else:
+                                direction = "down-to-left"
+                        elif next_col == col:
+                            if prev_col < next_col:
+                                direction = "left-to-top"
+                            else:
+                                direction = "right-to-top"
+                    Arrow(direction, row, col)
+                Arrow("goal", *path[-1])
+
+
         elif action == 3:
             if type(self.field[cell[0]][cell[1]].content).__name__ == 'Player':
                 sel_her_row, sel_her_col = cell[0], cell[1]
                 selected_hero = self.field[cell[0]][cell[1]].content
+                print(f'selected hero: {selected_hero}')
         # print(sel_her_row, sel_her_col, last_row, last_col)
 
 
@@ -275,11 +321,13 @@ class Unit:
             attack, defence, min_dmg, max_dmg, speed, hp, hp
 
     def attack_rat(self, enemy):
-        damage = random.randint(self.min_dmg, self.max_dmg) * (self.cur_atc / enemy.cur_dfc) * (self.count + 1)
+        damage = random.randint(self.min_dmg, self.max_dmg) * (self.cur_atc / enemy.cur_dfc) * (
+                self.count + 1)
         enemy.get_rat_damage(damage)
 
     def attack_hon(self, enemy):
-        damage = random.randint(self.min_dmg, self.max_dmg) * (self.cur_atc / enemy.cur_dfc) * (self.count + 1)
+        damage = random.randint(self.min_dmg, self.max_dmg) * (self.cur_atc / enemy.cur_dfc) * (
+                self.count + 1)
         if enemy.counter:
             enemy.get_honest_damage(damage, self)
         else:
@@ -291,7 +339,8 @@ class Unit:
         if self.count >= 0:
             self.counter = False
             attacker.get_rat_damage(
-                random.randint(self.min_dmg, self.max_dmg) * (self.cur_atc / attacker.cur_dfc) * (self.count + 1))
+                random.randint(self.min_dmg, self.max_dmg) * (self.cur_atc / attacker.cur_dfc) * (
+                        self.count + 1))
         else:
             self.dead = 1
 
@@ -378,6 +427,8 @@ class Player(pygame.sprite.Sprite):
     image = load_image('player.png', -1)
     null_item = Item("", 0, 0, "all", "")
     null_unit = Unit("", 0, 0, 0, 0, 0, 0, 0, "", False)
+    moving_animation = itertools.cycle([load_image(f'heroes/default/{i}.png') for i in range(
+        len([name for name in os.listdir('data/images/heroes/default')]) - 1)])
 
     def __init__(self, pos_y, pos_x, team):
         super().__init__(player_sprites)
@@ -430,8 +481,9 @@ class Player(pygame.sprite.Sprite):
                 return
         elif type(other).__name__ == 'Item':  # А тут вписать то что будет в этом классе,
             # который отвечает за предмет лежащий на поле
-            self.inventory[self.inventory.index(Player.null_item)] = Item(*other.stats())  # Что-то типа заглушки,
-            # которая превращает предмет, который лежит на полу в предмет, который в инвентаре герояTODO * 3
+            self.inventory[self.inventory.index(Player.null_item)] = Item(
+                *other.stats())  # Что-то типа заглушки,
+            # которая превращает предмет, который лежит на полу в предмет, который в инвентаре героя TODO * 3
 
         elif type(other).__name__ == 'build':
             if other.variety != 'town':  # Опять заглушка
@@ -450,6 +502,15 @@ class Player(pygame.sprite.Sprite):
     def meet(self, other):
         pass
 
+    def update(self, updating_type='', *args):
+        if updating_type:
+            if updating_type == 'moving':
+                self.image = next(self.moving_animation)
+                self.rect.move(*args)
+            # ... other types
+            else:
+                raise Exception(f'incorrect updating_type: {updating_type}')
+
 
 class Tile(pygame.sprite.Sprite):
     tile_images = {
@@ -461,8 +522,50 @@ class Tile(pygame.sprite.Sprite):
     def __init__(self, tile_type, pos_y, pos_x):
         super().__init__(tile_sprites)
         self.image = pygame.transform.scale(Tile.tile_images[tile_type], (tile_width, tile_height))
-        self.rect = self.image.get_rect().move(tile_width * pos_x,
-                                               tile_height * pos_y)
+        self.rect = self.image.get_rect().move(tile_width * pos_x, tile_height * pos_y)
+
+
+class Arrow(pygame.sprite.Sprite):
+    top_to_right = load_image("from-top-to-right-arrow.png")
+    left_to_right = load_image("from-left-to-right-arrow.png")
+    goal = load_image("goal.png")
+
+    def __init__(self, direction, pos_y, pos_x):
+        super().__init__(arrow_sprites)
+        if direction == 'goal':
+            self.image = Arrow.goal
+        elif direction == 'top-to-right':
+            self.image = Arrow.top_to_right
+        elif direction == 'right':
+            self.image = Arrow.left_to_right
+        elif direction == 'left':
+            self.image = pygame.transform.flip(Arrow.left_to_right, True, False)
+        elif direction == 'top':
+            self.image = pygame.transform.rotate(Arrow.left_to_right, 90)
+        elif direction == 'down':
+            self.image = pygame.transform.rotate(Arrow.left_to_right, -90)
+        elif direction == 'top-to-right':
+            self.image = Arrow.top_to_right
+        elif direction == 'right-to-down':
+            self.image = pygame.transform.rotate(Arrow.top_to_right, -90)
+        elif direction == 'down-to-left':
+            self.image = pygame.transform.rotate(Arrow.top_to_right, 180)
+        elif direction == 'left-to-top':
+            self.image = pygame.transform.rotate(Arrow.top_to_right, 90)
+        elif direction == 'top-to-left':
+            self.image = pygame.transform.flip(Arrow.top_to_right, True, False)
+        elif direction == 'left-to-down':
+            self.image = pygame.transform.rotate(
+                pygame.transform.flip(Arrow.top_to_right, False, True), -90)
+        elif direction == 'down-to-right':
+            self.image = pygame.transform.flip(Arrow.top_to_right, False, True)
+        elif direction == 'right-to-top':
+            self.image = pygame.transform.rotate(
+                pygame.transform.flip(Arrow.top_to_right, True, True), 180)
+        else:
+            raise Exception(f'incorrect Arrow direction: {direction}')
+        self.image = pygame.transform.scale(self.image, (tile_width, tile_height))
+        self.rect = self.image.get_rect().move(tile_width * pos_x, tile_height * pos_y)
 
 
 class Button(pygame.sprite.Sprite):
@@ -564,14 +667,16 @@ def start_screen():
     start_button.set_text("Start", font, pygame.Color(156, 130, 79))
     start_button.render()
 
-    settings_button = Button(button_sprites, screen, (WIDTH - bwidth) // 2, (HEIGHT - bheight) // 2, bwidth,
+    settings_button = Button(button_sprites, screen, (WIDTH - bwidth) // 2, (HEIGHT - bheight) // 2,
+                             bwidth,
                              bheight)
     settings_button.set_background_image('button-background.jpg')
     font = pygame.font.Font(None, 80)
     settings_button.set_text("Settings", font, pygame.Color(156, 130, 79))
     settings_button.render()
 
-    exit_button = Button(button_sprites, screen, (WIDTH - bwidth) // 2, (HEIGHT + bheight * 2) // 2, bwidth,
+    exit_button = Button(button_sprites, screen, (WIDTH - bwidth) // 2, (HEIGHT + bheight * 2) // 2,
+                         bwidth,
                          bheight, terminate)
     exit_button.set_background_image('button-background.jpg')
     font = pygame.font.Font(None, 80)
@@ -613,6 +718,7 @@ while running:
                 field.get_click(event)
     all_sprites.draw(screen)
     tile_sprites.draw(field.space)
+    arrow_sprites.draw(field.space)
     player_sprites.draw(field.space)
     screen.blit(field.space, (Field.margin_right, Field.margin_top))
     pygame.display.flip()
