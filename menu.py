@@ -2,8 +2,6 @@ import itertools
 import os
 import random
 import sys
-import traceback
-
 import networkx
 import pygame
 
@@ -144,11 +142,11 @@ class Field:  # Игровое поле
     def graph(self):
         for row in range(self.height):
             for col in range(self.width):
-                if self.field[row][col].content is None or type(
+                if (not self.field[row][col].is_blocked()) or type(
                         self.field[row][col].content).__name__ == 'Player':
                     posibilities = self.possible_turns(row, col)
                     for turn in posibilities:
-                        if self.field[row + turn[0]][col + turn[1]].content is None:
+                        if not self.field[row + turn[0]][col + turn[1]].is_blocked():
                             if turn[0] and turn[1]:
                                 pass
                             else:
@@ -195,36 +193,6 @@ class Field:  # Игровое поле
                     self.field[x][y] = Cell(content=Item('money', 0, 0, '', 0))
                 self.field[x][y].render(x, y)
 
-    def move(self, direction):
-
-        # Это все не работает. TODO: нормальное передвижение героев
-        return
-
-        x, y = self.player.get_pos()
-        if direction == 'up':
-            if y > 0 and not self.field[y - 1][x].is_blocked():
-                self.player.move(x, y - 1)
-                y -= 1
-        elif direction == 'down':
-            if y < self.height - 1 and not self.field[y + 1][x].is_blocked():
-                self.player.move(x, y + 1)
-                y += 1
-        elif direction == 'left':
-            if x > 0 and not self.field[y][x - 1].is_blocked():
-                self.player.move(x - 1, y)
-                x -= 1
-        elif direction == 'right':
-            if x < self.width - 1 and not self.field[y][x + 1].is_blocked():
-                self.player.move(x + 1, y)
-                x += 1
-
-        content = self.field[y][x].get_content()
-        if content is not None:
-            self.player.interact(content)
-            if type(content).__name__ == "Item":
-                self.field[y][x].content = None
-                self.field[y][x].render(y, x)
-
     def get_click(self, event):
         cell = self.get_cell(event.pos)
 
@@ -242,20 +210,61 @@ class Field:  # Игровое поле
                 mouse_pos[0] - Field.margin_left) // tile_width  # row col
 
     def on_click(self, cell, action):
-        global sel_her_col, sel_her_row, last_row, last_col, selected_hero
+        global sel_her_col, sel_her_row, last_row, last_col, selected_hero, path
         if action == 1 and selected_hero is not None:
-            path = []
+            if selected_hero.get_pos() == cell[::-1]:
+                return
             if (last_row, last_col) == cell:
                 # Убираем стрелочки
                 arrow_sprites.empty()
-                # TODO: Анимация передвижения героев (путь строится, стрелочки рисуются)
+                for row, col in path[1:]:
+                    prev_col, prev_row = selected_hero.get_pos()
+                    k = 7  # Коэфиициент скорости движения
+                    drow = (row - prev_row) * k  # delta rows (in pixels)
+                    dcol = (col - prev_col) * k  # delta cols (in pixels)
+                    if dcol:
+                        selected_hero.set_reversed(dcol < 0)
+                    prev_row *= tile_height
+                    prev_col *= tile_width
+                    while not (row * tile_height - abs(drow) <= prev_row <= row * tile_height + abs(
+                            drow) and
+                               col * tile_width - abs(dcol) <= prev_col <= col * tile_width + abs(
+                                dcol)):
+                        for event in pygame.event.get():
+                            if event.type == pygame.QUIT or (
+                                    event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                                terminate()
+                        prev_row += drow
+                        prev_col += dcol
+                        selected_hero.update('moving', dcol, drow)
+
+                        # Взаимодейтсвие с предметами
+                        content = self.field[row][col].get_content()
+                        if content is not None:
+                            selected_hero.interact(content)
+                            if type(content).__name__ == "Item":
+                                self.field[row][col].content = None
+                                self.field[row][col].render(row, col)
+
+                        tile_sprites.draw(self.space)
+                        player_sprites.draw(self.space)
+                        screen.blit(self.space, (Field.margin_right, Field.margin_top))
+                        pygame.display.flip()
+                        clock.tick(FPS)
+                    selected_hero.move(col, row)
+                    sel_her_col, sel_her_row = selected_hero.get_pos()
+                selected_hero.image = selected_hero.default_image
+
             else:
                 # Убираем старые стрелочки
                 arrow_sprites.empty()
                 # Рисуем стрелочки
                 last_row, last_col = cell
-                path = networkx.shortest_path(self.Dg, str(sel_her_row) + ',' + str(sel_her_col),
-                                              str(last_row) + ',' + str(last_col), weight=1)
+                try:
+                    path = networkx.shortest_path(self.Dg, str(sel_her_row) + ',' + str(sel_her_col),
+                                                  str(last_row) + ',' + str(last_col), weight=1)
+                except networkx.NetworkXNoPath:
+                    return
                 path = list(map(lambda x: list(map(int, x.split(','))), path))
                 for i, (row, col) in enumerate(path[1:-1], 1):
                     prev_row, prev_col = path[i - 1]
@@ -301,7 +310,6 @@ class Field:  # Игровое поле
             if type(self.field[cell[0]][cell[1]].content).__name__ == 'Player':
                 sel_her_row, sel_her_col = cell[0], cell[1]
                 selected_hero = self.field[cell[0]][cell[1]].content
-                print(f'selected hero: {selected_hero}')
         # print(sel_her_row, sel_her_col, last_row, last_col)
 
 
@@ -424,16 +432,18 @@ class Item:
 
 
 class Player(pygame.sprite.Sprite):
-    image = load_image('player.png', -1)
+    default_image = load_image('player.png', -1)
     null_item = Item("", 0, 0, "all", "")
     null_unit = Unit("", 0, 0, 0, 0, 0, 0, 0, "", False)
-    moving_animation = itertools.cycle([load_image(f'heroes/default/{i}.png') for i in range(
-        len([name for name in os.listdir('data/images/heroes/default')]) - 1)])
+    moving_animation = itertools.cycle(
+        [pygame.transform.scale(load_image(f'heroes/default/{i}.png'), (tile_width, tile_height)) for
+         i in range(len([name for name in os.listdir('data/images/heroes/default')]) - 1)])
+    animation_counter = 0
 
     def __init__(self, pos_y, pos_x, team):
         super().__init__(player_sprites)
         self.team = team
-        self.image = pygame.transform.scale(self.image, (tile_width, tile_height))
+        self.image = pygame.transform.scale(self.default_image, (tile_width, tile_height))
         self.rect = self.image.get_rect().move(tile_width * pos_x,
                                                tile_height * pos_y)
         self.pos = pos_x, pos_y
@@ -449,8 +459,7 @@ class Player(pygame.sprite.Sprite):
 
     def move(self, x, y):
         self.pos = x, y
-        self.rect = self.image.get_rect().move(tile_width * x,
-                                               tile_height * y)
+        self.rect = self.image.get_rect().move(tile_width * x, tile_height * y)
 
     def get_pos(self):
         return self.pos
@@ -481,8 +490,8 @@ class Player(pygame.sprite.Sprite):
                 return
         elif type(other).__name__ == 'Item':  # А тут вписать то что будет в этом классе,
             # который отвечает за предмет лежащий на поле
-            self.inventory[self.inventory.index(Player.null_item)] = Item(
-                *other.stats())  # Что-то типа заглушки,
+            pass
+            # self.inventory[self.inventory.index(Player.null_item)] = Item(*other.stats())  # Что-то типа заглушки,
             # которая превращает предмет, который лежит на полу в предмет, который в инвентаре героя TODO * 3
 
         elif type(other).__name__ == 'build':
@@ -505,11 +514,22 @@ class Player(pygame.sprite.Sprite):
     def update(self, updating_type='', *args):
         if updating_type:
             if updating_type == 'moving':
-                self.image = next(self.moving_animation)
-                self.rect.move(*args)
+                if not self.animation_counter:
+                    self.image = next(self.moving_animation)
+                self.animation_counter += 1
+                self.animation_counter %= 5
+                self.rect = self.rect.move(*args)
             # ... other types
             else:
                 raise Exception(f'incorrect updating_type: {updating_type}')
+
+    def set_reversed(self, reversed):
+        self.moving_animation = itertools.cycle(
+            [pygame.transform.flip(
+                pygame.transform.scale(load_image(f'heroes/default/{i}.png'),
+                                       (tile_width, tile_height)),
+                reversed, False) for i in
+                range(len([name for name in os.listdir('data/images/heroes/default')]) - 1)])
 
 
 class Tile(pygame.sprite.Sprite):
@@ -561,7 +581,7 @@ class Arrow(pygame.sprite.Sprite):
             self.image = pygame.transform.flip(Arrow.top_to_right, False, True)
         elif direction == 'right-to-top':
             self.image = pygame.transform.rotate(
-                pygame.transform.flip(Arrow.top_to_right, True, True), 180)
+                pygame.transform.flip(Arrow.top_to_right, True, False), -90)
         else:
             raise Exception(f'incorrect Arrow direction: {direction}')
         self.image = pygame.transform.scale(self.image, (tile_width, tile_height))
