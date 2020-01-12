@@ -50,6 +50,63 @@ unit_sprites = pygame.sprite.Group()
 arrow_sprites = pygame.sprite.Group()
 
 
+class Item:
+    def __init__(self, name, d_atc, d_dfc, description, slot, tile_type='coins', feature=None):
+        self.name, self.d_atc, self.d_dfc, self.description, self.feature = name, d_atc, d_dfc, description, feature
+        self.slot = slot
+        self.tile_type = tile_type
+
+    def equip_dequip(self):
+        return self.d_atc, self.d_dfc, self.feature
+
+    def get_description(self):
+        return self.description
+
+    def __eq__(self, other):
+        if self.name == other.name and self.d_atc == other.d_atc and self.d_dfc == other.d_dfc and self.description == other.description and self.feature == other.feature:
+            return True
+        return False
+
+    def render(self, x, y):
+        Tile(self.tile_type, x, y)
+
+    def stats(self):  # я хз что она должна возвращать TODO Item.stats()
+        return self.name, self.d_atc, self.d_dfc, self.description, self.feature
+
+
+# Библитека предметов
+ITEMS = {
+    'club': Item('Дубина', 2, 0, "Мощная, но неудобная дубина огра", 'weapon', 'club'),
+    'darksword': Item('Зловещий меч', 4, 0, "Постаревший от времени меч мертвеца", 'weapon', 'darksword'),
+    'mace': Item('Кистень', 8, 0, "Сделанный на славу кистень", 'weapon', 'mace'),
+    'titansword': Item('Меч титана', 12, -3, "Тяжелый меч, которым сложно защищаться", 'weapon', 'titansword'),
+
+    'poorshield': Item('Щит бедняка', 0, 2, "Щит мертвого оборванца", 'shield', 'poorshield'),
+    'darkshield': Item('Щит мертвеца', 0, 4, "Ржавый щит, украшенный черепом", 'shield', 'darkshield'),
+    'ironshield': Item('Щит 1000 гномьих судеб', 0, 8, "Щит, над которым старлся город гномов", 'shield', 'ironshield'),
+    'bestshield': Item('Щит печально павшего воина', -3, 12, "Щит последнего воина", 'shield', 'bestshield'),
+
+    'crownhelm': Item('Корона', 0, 2, "Корона, которая лучше смотрится на королях", 'helm', 'crownhelm'),
+    'darkhelm': Item('Мертвецкий шлем', 0, 4, "Шлем умершего короля мертвых", 'helm', 'darkhelm'),
+    'skullhelm': Item('Шлем-череп', 8, -2, "Проклятый (?) богами шлем", 'helm', 'skullhelm'),
+    'hornhelm': Item('Шлем стада единорогов', 10, 8, "Шлем с трофеями стального единорога", 'helm', 'hornhelm'),
+
+    'darkboots': Item('Боты обмана', -2, -6, "Ботинки обманщика-марафонца", 'boots', 'darkboots', {'bonus_move': 500}),
+    'saintboots': Item('Сандали Мироздателя', 4, 4, "Сандали Мироздателя", 'boots', 'saintboots'),
+    'speedboots': Item('Скороходы', 0, 0, "Ботинки из душ лошадей", 'boots', 'speedboots', {'bonus_move': 1500}),
+    'boneboots': Item('Ботинки погребенных', 2, 2, "Поножи из костей невинных рабов", 'boots', 'boneboots'),
+
+    'poorchest': Item('Школьный нагрудник', 2, 6, "Нагрудник ученика школы наездников", 'chest', 'poorchest'),
+    'firechest': Item('Кираса огня', 4, 9, "Кираса адского пламени", 'chest', 'firechest'),
+    'goldchest': Item('Праздничный наряд', 8, 14, "Торжественное одеяние циклопов по праздникам", 'chest', 'goldchest'),
+    'titanchest': Item('Титаноывй нагрудник', 12, 20, "Нагрудник Герерала Титанов", 'chest', 'titanchest'),
+
+    'speedglove': Item('Конные перчатки', 0, 0, "Перчатки скорой дикости", 'other', 'glovespeed', {'bonus_move': 500}),
+    'rib': Item('Лента дипломата', 0, 0, "Лента дипломата. Все идут за вами", 'other', 'rib', {'sale': 1}),
+    'costring': Item('Лента дипломата', 0, 0, "Кольцо дипломата. Все идут за вами", 'other', 'ringcost', {'sale': 1}),
+}
+
+
 class Block:  # Предмет, блокирующий проход
     def __init__(self, tile_type='rock'):
         self.tile_type = tile_type
@@ -399,30 +456,6 @@ class Meet:  # TODO
         pass
 
 
-class Item:
-    def __init__(self, name, d_atc, d_dfc, description, slot, tile_type='coins', feature=None):
-        self.name, self.d_atc, self.d_dfc, self.description, self.feature = name, d_atc, d_dfc, description, feature
-        self.slot = slot
-        self.tile_type = tile_type
-
-    def equip_dequip(self):
-        return self.d_atc, self.d_dfc, self.feature
-
-    def get_description(self):
-        return self.description
-
-    def __eq__(self, other):
-        if self.name == other.name and self.d_atc == other.d_atc and self.d_dfc == other.d_dfc and self.description == other.description and self.feature == other.feature:
-            return True
-        return False
-
-    def render(self, x, y):
-        Tile(self.tile_type, x, y)
-
-    def stats(self):  # я хз что она должна возвращать TODO Item.stats()
-        pass
-
-
 class Player(pygame.sprite.Sprite):
     image = load_image('player.png', -1)
     null_item = Item("", 0, 0, "all", "")
@@ -443,7 +476,7 @@ class Player(pygame.sprite.Sprite):
         self.xp, self.next_level = 0, 1000
         self.inventory = [Player.null_item] * 30
         self.equiped_items = [Player.null_item] * 10
-        self.bonus = {'anti_tax': 0, 'd_hp': 0, 'bonus_move': 0, 'd_spd': 0}
+        self.bonus = {'sale': 1, 'd_hp': 0, 'bonus_move': 0, 'd_spd': 0}
         self.army = [Player.null_unit] * 7
         self.movepoints = 2000
 
@@ -481,8 +514,7 @@ class Player(pygame.sprite.Sprite):
                 return
         elif type(other).__name__ == 'Item':  # А тут вписать то что будет в этом классе,
             # который отвечает за предмет лежащий на поле
-            self.inventory[self.inventory.index(Player.null_item)] = Item(
-                *other.stats())  # Что-то типа заглушки,
+            self.inventory[self.inventory.index(Player.null_item)] = other  # Что-то типа заглушки,
             # которая превращает предмет, который лежит на полу в предмет, который в инвентаре героя TODO * 3
 
         elif type(other).__name__ == 'build':
@@ -514,8 +546,31 @@ class Player(pygame.sprite.Sprite):
 
 class Tile(pygame.sprite.Sprite):
     tile_images = {
+        'bestshield': load_image("items/bestshield-floor.png", -1),
+        'boneboots': load_image("items/boneboots-floor.png", -1),
+        'club': load_image("items/club-floor.png", -1),
+        'costrib': load_image("items/costrib-floor.png", -1),
+        'costring': load_image("items/costring-floor.png", -1),
+        'crownhelm': load_image("items/crownhelm-floor.png", -1),
+        'darkboots': load_image("items/darkboots-floor.png", -1),
+        'darkhelm': load_image("items/darkhelm-floor.png", -1),
+        'darkshield': load_image("items/darkshield-floor.png", -1),
+        'darksword': load_image("items/darksword-floor.png"),
+        'firechest': load_image("items/firechest-floor.png", -1),
+        'goldchest': load_image("items/goldchest-floor.png", -1),
+        'hornhelm': load_image("items/hornhelm-floor.png", -1),
+        'ironshield': load_image("items/ironshield-floor.png", -1),
+        'mace': load_image("items/mace-floor.png", -1),
+        'poorchest': load_image("items/poorchest-floor.png", -1),
+        'poorshield': load_image("items/poorshield-floor.png", -1),
+        'saintboots': load_image("items/saintboots-floor.png", -1),
+        'skullhelm': load_image("items/skullhelm-floor.png", -1),
+        'speedboots': load_image("items/speedboots-floor.png", -1),
+        'speedglove': load_image("items/speedglove-floor.png", -1),
+        'titanchest': load_image("items/titanchest-floor.png", -1),
+        'titansword': load_image("items/titansword-floor.png", -1),
         'grass': load_image("grass.png"),
-        'rock': load_image("rock.png", -1),
+        'rock': load_image("rock.png"),
         'coins': load_image("coins.png"),
     }
 
