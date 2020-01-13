@@ -1,11 +1,15 @@
-import pygame
+import itertools
 import os
-import sys
 import random
+import sys
+import networkx
+import pygame
 
 GREEN, RED, BLUE, YELLOW = 'green', 'red', 'blue', 'yellow'
-
-N = 4  # int(input())  # tmp
+selected_hero, current_color = None, GREEN
+sel_her_row, sel_her_col = None, None
+last_row, last_col = -1, -1
+N = 1  # tmp
 
 pygame.init()
 screen_info = pygame.display.Info()
@@ -41,6 +45,7 @@ button_sprites = pygame.sprite.Group()
 tile_sprites = pygame.sprite.Group()
 player_sprites = pygame.sprite.Group()
 unit_sprites = pygame.sprite.Group()
+arrow_sprites = pygame.sprite.Group()
 
 
 class Block:  # Предмет, блокирующий проход
@@ -52,7 +57,7 @@ class Block:  # Предмет, блокирующий проход
 
 
 class Cell:  # Ячейка поля Field
-    def __init__(self, cost=0, tile_type='grass', content=None):
+    def __init__(self, cost=100, tile_type='grass', content=None):
         self.cost = cost  # cost - стоимость передвижения по клетке
         self.tile_type = tile_type
         self.content = content  # content - содержимое ячейки (None, экземпляр класса Block или любой другой объект)
@@ -90,6 +95,7 @@ class Field:  # Игровое поле
     margin_bottom = int(16 / 732 * size_in_pixels[1])
 
     def __init__(self, filename, number_of_players=1):
+        self.Dg = networkx.DiGraph()
         filename = "data/maps/" + filename
         with open(filename, 'r') as mapFile:
             level_map = [line.strip() for line in mapFile]
@@ -103,6 +109,49 @@ class Field:  # Игровое поле
         self.number_of_players = number_of_players
 
         self.render()
+        self.graph()
+
+    def possible_turns(self, WantRow, WantColumn):
+        if WantRow == self.height - 1 and WantColumn == self.width - 1:
+            return [[0, -1], [-1, -1], [-1, 0]]
+
+        if self.height - 1 > WantRow > 0 and self.width - 1 > WantColumn > 0:
+            return [[0, 1], [1, 1], [1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1]]
+
+        if self.height - 1 > WantRow > 0 and WantColumn == 0:
+            return [[-1, 0], [-1, 1], [0, 1], [1, 1], [1, 0]]
+
+        if 0 < WantRow < self.height - 1 and WantColumn == self.width - 1:
+            return [[-1, 0], [-1, -1], [0, -1], [1, -1], [1, 0]]
+
+        if self.width - 1 > WantColumn > 0 and WantRow == 0:
+            return [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1]]
+
+        if 0 < WantColumn < self.width - 1 and self.height - 1 == WantRow:
+            return [[0, -1], [-1, -1], [-1, 0], [-1, 1], [0, 1]]
+
+        if WantRow == 0 and WantColumn == 0:
+            return [[0, 1], [1, 1], [1, 0]]
+
+        if WantRow == 0 and WantColumn == self.width - 1:
+            return [[0, -1], [1, -1], [1, 0]]
+
+        if WantRow == self.height - 1 and WantColumn == 0:
+            return [[-1, 0], [-1, 1], [0, 1]]
+
+    def graph(self):
+        for row in range(self.height):
+            for col in range(self.width):
+                if (not self.field[row][col].is_blocked()) or type(
+                        self.field[row][col].content).__name__ == 'Player':
+                    posibilities = self.possible_turns(row, col)
+                    for turn in posibilities:
+                        if not self.field[row + turn[0]][col + turn[1]].is_blocked():
+                            if turn[0] and turn[1]:
+                                pass
+                            else:
+                                self.Dg.add_edge(str(row) + ',' + str(col),
+                                                 str(row + turn[0]) + ',' + str(col + turn[1]))
 
     def render(self):
         self.frame = pygame.transform.scale(load_image('frame.png'), Field.size_in_pixels)
@@ -144,49 +193,124 @@ class Field:  # Игровое поле
                     self.field[x][y] = Cell(content=Item('money', 0, 0, '', 0))
                 self.field[x][y].render(x, y)
 
-    def move(self, direction):
+    def get_click(self, event):
+        cell = self.get_cell(event.pos)
 
-        # Это все не работает. TODO: нормальное передвижение героев
-        return
-
-        x, y = self.player.get_pos()
-        if direction == 'up':
-            if y > 0 and not self.field[y - 1][x].is_blocked():
-                self.player.move(x, y - 1)
-                y -= 1
-        elif direction == 'down':
-            if y < self.height - 1 and not self.field[y + 1][x].is_blocked():
-                self.player.move(x, y + 1)
-                y += 1
-        elif direction == 'left':
-            if x > 0 and not self.field[y][x - 1].is_blocked():
-                self.player.move(x - 1, y)
-                x -= 1
-        elif direction == 'right':
-            if x < self.width - 1 and not self.field[y][x + 1].is_blocked():
-                self.player.move(x + 1, y)
-                x += 1
-
-        content = self.field[y][x].get_content()
-        if content is not None:
-            self.player.interact(content)
-            if type(content).__name__ == "Item":
-                self.field[y][x].content = None
-                self.field[y][x].render(y, x)
-
-    def get_click(self, mouse_pos):
-        cell = self.get_cell(mouse_pos)
         if cell is not None:
-            self.on_click(cell)
+            self.on_click(cell, event.button)
 
     def get_cell(self, mouse_pos):
-        if not (Field.margin_left <= mouse_pos[0] <= Field.margin_left + self.width * tile_width) or not (
-                Field.margin_top <= mouse_pos[1] <= Field.margin_top + self.height * tile_height):
+        if not (Field.margin_left <= mouse_pos[
+            0] <= Field.margin_left + self.width * tile_width) or not (
+                Field.margin_top <= mouse_pos[
+            1] <= Field.margin_top + self.height * tile_height) or not (
+                mouse_pos[0] < Field.size_in_pixels[0] and mouse_pos[1] < Field.size_in_pixels[1]):
             return None
-        return (mouse_pos[1] - Field.margin_top) // tile_height, (mouse_pos[0] - Field.margin_left) // tile_width
+        return (mouse_pos[1] - Field.margin_top) // tile_height, (
+                mouse_pos[0] - Field.margin_left) // tile_width  # row col
 
-    def on_click(self, cell_coords):
-        pass
+    def on_click(self, cell, action):
+        global sel_her_col, sel_her_row, last_row, last_col, selected_hero, path
+        if action == 1 and selected_hero is not None:
+            if selected_hero.get_pos() == cell[::-1]:
+                return
+            if (last_row, last_col) == cell:
+                # Убираем стрелочки
+                arrow_sprites.empty()
+                for row, col in path[1:]:
+                    prev_col, prev_row = selected_hero.get_pos()
+                    k = 7  # Коэфиициент скорости движения
+                    drow = (row - prev_row) * k  # delta rows (in pixels)
+                    dcol = (col - prev_col) * k  # delta cols (in pixels)
+                    if dcol:
+                        selected_hero.set_reversed(dcol < 0)
+                    prev_row *= tile_height
+                    prev_col *= tile_width
+                    while not (row * tile_height - abs(drow) <= prev_row <= row * tile_height + abs(
+                            drow) and
+                               col * tile_width - abs(dcol) <= prev_col <= col * tile_width + abs(
+                                dcol)):
+                        for event in pygame.event.get():
+                            if event.type == pygame.QUIT or (
+                                    event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                                terminate()
+                        prev_row += drow
+                        prev_col += dcol
+                        selected_hero.update('moving', dcol, drow)
+
+                        # Взаимодейтсвие с предметами
+                        content = self.field[row][col].get_content()
+                        if content is not None:
+                            selected_hero.interact(content)
+                            if type(content).__name__ == "Item":
+                                self.field[row][col].content = None
+                                self.field[row][col].render(row, col)
+
+                        tile_sprites.draw(self.space)
+                        player_sprites.draw(self.space)
+                        screen.blit(self.space, (Field.margin_right, Field.margin_top))
+                        pygame.display.flip()
+                        clock.tick(FPS)
+                    selected_hero.move(col, row)
+                    sel_her_col, sel_her_row = selected_hero.get_pos()
+                selected_hero.image = selected_hero.default_image
+
+            else:
+                # Убираем старые стрелочки
+                arrow_sprites.empty()
+                # Рисуем стрелочки
+                last_row, last_col = cell
+                try:
+                    path = networkx.shortest_path(self.Dg, str(sel_her_row) + ',' + str(sel_her_col),
+                                                  str(last_row) + ',' + str(last_col), weight=1)
+                except networkx.NetworkXNoPath:
+                    return
+                path = list(map(lambda x: list(map(int, x.split(','))), path))
+                for i, (row, col) in enumerate(path[1:-1], 1):
+                    prev_row, prev_col = path[i - 1]
+                    next_row, next_col = path[i + 1]
+                    # Определяем направление стрелочки
+                    if prev_row == next_row:
+                        if prev_col < next_col:
+                            direction = "right"
+                        else:
+                            direction = "left"
+                    elif prev_col == next_col:
+                        if prev_row < next_row:
+                            direction = "down"
+                        else:
+                            direction = "top"
+                    elif prev_row < next_row:
+                        if next_row == row:
+                            if prev_col < next_col:
+                                direction = "top-to-right"
+                            elif prev_col > next_col:
+                                direction = "top-to-left"
+                        elif next_col == col:
+                            if prev_col < next_col:
+                                direction = "left-to-down"
+                            if prev_col > next_col:
+                                direction = "right-to-down"
+                    else:
+                        if next_row == row:
+                            if prev_col < next_col:
+                                direction = "down-to-right"
+                            else:
+                                direction = "down-to-left"
+                        elif next_col == col:
+                            if prev_col < next_col:
+                                direction = "left-to-top"
+                            else:
+                                direction = "right-to-top"
+                    Arrow(direction, row, col)
+                Arrow("goal", *path[-1])
+
+
+        elif action == 3:
+            if type(self.field[cell[0]][cell[1]].content).__name__ == 'Player':
+                sel_her_row, sel_her_col = cell[0], cell[1]
+                selected_hero = self.field[cell[0]][cell[1]].content
+        # print(sel_her_row, sel_her_col, last_row, last_col)
 
 
 class Unit(pygame.sprite.Sprite):
@@ -204,11 +328,13 @@ class Unit(pygame.sprite.Sprite):
             attack, defence, min_dmg, max_dmg, speed, hp, hp
 
     def attack_rat(self, enemy):
-        damage = random.randint(self.min_dmg, self.max_dmg) * (self.cur_atc / enemy.cur_dfc) * (self.count + 1)
+        damage = random.randint(self.min_dmg, self.max_dmg) * (self.cur_atc / enemy.cur_dfc) * (
+                self.count + 1)
         enemy.get_rat_damage(damage)
 
     def attack_hon(self, enemy):
-        damage = random.randint(self.min_dmg, self.max_dmg) * (self.cur_atc / enemy.cur_dfc) * (self.count + 1)
+        damage = random.randint(self.min_dmg, self.max_dmg) * (self.cur_atc / enemy.cur_dfc) * (
+                self.count + 1)
         if enemy.counter:
             enemy.get_honest_damage(damage, self)
         else:
@@ -220,7 +346,8 @@ class Unit(pygame.sprite.Sprite):
         if self.count >= 0:
             self.counter = False
             attacker.get_rat_damage(
-                random.randint(self.min_dmg, self.max_dmg) * (self.cur_atc / attacker.cur_dfc) * (self.count + 1))
+                random.randint(self.min_dmg, self.max_dmg) * (self.cur_atc / attacker.cur_dfc) * (
+                        self.count + 1))
         else:
             self.dead = 1
 
@@ -441,14 +568,18 @@ class Item:
 
 
 class Player(pygame.sprite.Sprite):
-    image = load_image('player.png', -1)
+    default_image = load_image('player.png', -1)
     null_item = Item("", 0, 0, "all", "")
     null_unit = Unit("player.png", "", 0, 0, 0, 0, 0, 0, 0, "", False)
+    moving_animation = itertools.cycle(
+        [pygame.transform.scale(load_image(f'heroes/default/{i}.png'), (tile_width, tile_height)) for
+         i in range(len([name for name in os.listdir('data/images/heroes/default')]) - 1)])
+    animation_counter = 0
 
     def __init__(self, pos_y, pos_x, team):
         super().__init__(player_sprites)
         self.team = team
-        self.image = pygame.transform.scale(self.image, (tile_width, tile_height))
+        self.image = pygame.transform.scale(self.default_image, (tile_width, tile_height))
         self.original_image = self.image.copy()
         self.rect = self.image.get_rect().move(tile_width * pos_x,
                                                tile_height * pos_y)
@@ -461,11 +592,11 @@ class Player(pygame.sprite.Sprite):
         self.equiped_items = [Player.null_item] * 10
         self.bonus = {'anti_tax': 0, 'd_hp': 0, 'bonus_move': 0, 'd_spd': 0}
         self.army = [Player.null_unit] * 7
+        self.movepoints = 2000
 
     def move(self, x, y):
         self.pos = x, y
-        self.rect = self.image.get_rect().move(tile_width * x,
-                                               tile_height * y)
+        self.rect = self.image.get_rect().move(tile_width * x, tile_height * y)
 
     def get_pos(self):
         return self.pos
@@ -496,8 +627,9 @@ class Player(pygame.sprite.Sprite):
                 return
         elif type(other).__name__ == 'Item':  # А тут вписать то что будет в этом классе,
             # который отвечает за предмет лежащий на поле
-            self.inventory[self.inventory.index(Player.null_item)] = Item(*other.stats())  # Что-то типа заглушки,
-            # которая превращает предмет, который лежит на полу в предмет, который в инвентаре герояTODO * 3
+            pass
+            # self.inventory[self.inventory.index(Player.null_item)] = Item(*other.stats())  # Что-то типа заглушки,
+            # которая превращает предмет, который лежит на полу в предмет, который в инвентаре героя TODO * 3
 
         elif type(other).__name__ == 'build':
             if other.variety != 'town':  # Опять заглушка
@@ -525,6 +657,26 @@ class Player(pygame.sprite.Sprite):
                                                                                    int(tile_width * 0.3),
                                                                                    int(tile_height * 0.2)))
 
+    def update(self, updating_type='', *args):
+        if updating_type:
+            if updating_type == 'moving':
+                if not self.animation_counter:
+                    self.image = next(self.moving_animation)
+                self.animation_counter += 1
+                self.animation_counter %= 5
+                self.rect = self.rect.move(*args)
+            # ... other types
+            else:
+                raise Exception(f'incorrect updating_type: {updating_type}')
+
+    def set_reversed(self, reversed):
+        self.moving_animation = itertools.cycle(
+            [pygame.transform.flip(
+                pygame.transform.scale(load_image(f'heroes/default/{i}.png'),
+                                       (tile_width, tile_height)),
+                reversed, False) for i in
+                range(len([name for name in os.listdir('data/images/heroes/default')]) - 1)])
+
 
 class Tile(pygame.sprite.Sprite):
     tile_images = {
@@ -536,8 +688,50 @@ class Tile(pygame.sprite.Sprite):
     def __init__(self, tile_type, pos_y, pos_x):
         super().__init__(tile_sprites)
         self.image = pygame.transform.scale(Tile.tile_images[tile_type], (tile_width, tile_height))
-        self.rect = self.image.get_rect().move(tile_width * pos_x,
-                                               tile_height * pos_y)
+        self.rect = self.image.get_rect().move(tile_width * pos_x, tile_height * pos_y)
+
+
+class Arrow(pygame.sprite.Sprite):
+    top_to_right = load_image("from-top-to-right-arrow.png")
+    left_to_right = load_image("from-left-to-right-arrow.png")
+    goal = load_image("goal.png")
+
+    def __init__(self, direction, pos_y, pos_x):
+        super().__init__(arrow_sprites)
+        if direction == 'goal':
+            self.image = Arrow.goal
+        elif direction == 'top-to-right':
+            self.image = Arrow.top_to_right
+        elif direction == 'right':
+            self.image = Arrow.left_to_right
+        elif direction == 'left':
+            self.image = pygame.transform.flip(Arrow.left_to_right, True, False)
+        elif direction == 'top':
+            self.image = pygame.transform.rotate(Arrow.left_to_right, 90)
+        elif direction == 'down':
+            self.image = pygame.transform.rotate(Arrow.left_to_right, -90)
+        elif direction == 'top-to-right':
+            self.image = Arrow.top_to_right
+        elif direction == 'right-to-down':
+            self.image = pygame.transform.rotate(Arrow.top_to_right, -90)
+        elif direction == 'down-to-left':
+            self.image = pygame.transform.rotate(Arrow.top_to_right, 180)
+        elif direction == 'left-to-top':
+            self.image = pygame.transform.rotate(Arrow.top_to_right, 90)
+        elif direction == 'top-to-left':
+            self.image = pygame.transform.flip(Arrow.top_to_right, True, False)
+        elif direction == 'left-to-down':
+            self.image = pygame.transform.rotate(
+                pygame.transform.flip(Arrow.top_to_right, False, True), -90)
+        elif direction == 'down-to-right':
+            self.image = pygame.transform.flip(Arrow.top_to_right, False, True)
+        elif direction == 'right-to-top':
+            self.image = pygame.transform.rotate(
+                pygame.transform.flip(Arrow.top_to_right, True, False), -90)
+        else:
+            raise Exception(f'incorrect Arrow direction: {direction}')
+        self.image = pygame.transform.scale(self.image, (tile_width, tile_height))
+        self.rect = self.image.get_rect().move(tile_width * pos_x, tile_height * pos_y)
 
 
 class Button(pygame.sprite.Sprite):
@@ -662,24 +856,13 @@ while running:
                 event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
             terminate()
         elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_UP:
-                field.move('up')
-            if event.key == pygame.K_DOWN:
-                field.move('down')
-            if event.key == pygame.K_LEFT:
-                field.move('left')
-            if event.key == pygame.K_RIGHT:
-                field.move('right')
-            if event.key == pygame.K_f:
-                fight(field.players[GREEN][0], field.players[BLUE][0])
+            pass
         elif event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1:
-                edge_x, edge_y = field.size_in_pixels
-                x, y = event.pos
-                if x < edge_x and y < edge_y:
-                    print(1)
+            if event.button == 1 or event.button == 3:
+                field.get_click(event)
     all_sprites.draw(screen)
     tile_sprites.draw(field.space)
+    arrow_sprites.draw(field.space)
     player_sprites.draw(field.space)
     screen.blit(field.space, (Field.margin_right, Field.margin_top))
     pygame.display.flip()
