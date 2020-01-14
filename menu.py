@@ -9,7 +9,7 @@ GREEN, RED, BLUE, YELLOW = 'green', 'red', 'blue', 'yellow'
 selected_hero, current_color = None, GREEN
 sel_her_row, sel_her_col = None, None
 last_row, last_col = -1, -1
-N = 1  # tmp
+N = 2  # tmp
 
 pygame.init()
 screen_info = pygame.display.Info()
@@ -102,7 +102,7 @@ class Item:
     def render(self, x, y):
         Tile(self.tile_type, x, y)
 
-    def stats(self):  # я хз что она должна возвращать TODO Item.stats()
+    def stats(self):
         return self.name, self.d_atc, self.d_dfc, self.description, self.feature
 
 
@@ -190,11 +190,16 @@ class ControlPanel:  # Панель управления в правой час�
     width = 200  # px
     backgroung = pygame.transform.scale(load_image("control-panel-background.jpg"), (width, HEIGHT))
 
-    def __init__(self):
+    def __init__(self, field):
         screen.blit(ControlPanel.backgroung, (WIDTH - ControlPanel.width, 0))
+        self.field = field
 
     def draw(self):
         screen.blit(ControlPanel.backgroung, (WIDTH - ControlPanel.width, 0))
+
+    def render_minimap(self):
+        pass
+    # TODO minimap
 
 
 class Field:  # Игровое поле
@@ -203,6 +208,8 @@ class Field:  # Игровое поле
     margin_right = int(13 / 1171 * size_in_pixels[0])
     margin_left = int(15 / 1171 * size_in_pixels[0])
     margin_bottom = int(16 / 732 * size_in_pixels[1])
+    row_count = (size_in_pixels[1] - margin_top - margin_bottom) // tile_height
+    col_count = (size_in_pixels[0] - margin_left - margin_right) // tile_width
 
     def __init__(self, filename, number_of_players=1):
         self.Dg = networkx.DiGraph()
@@ -266,7 +273,6 @@ class Field:  # Игровое поле
     def render(self):
         self.frame = pygame.transform.scale(load_image('frame.png'), Field.size_in_pixels)
         screen.blit(self.frame, (0, 0))
-        w, h = self.frame.get_size()
         self.space = pygame.Surface((self.width * tile_width,
                                      self.height * tile_height))
 
@@ -308,11 +314,11 @@ class Field:  # Игровое поле
             self.on_click(cell, event.button)
 
     def get_cell(self, mouse_pos):
-        if not (Field.margin_left <= mouse_pos[
-            0] <= Field.margin_left + self.width * tile_width) or not (
-                Field.margin_top <= mouse_pos[
-            1] <= Field.margin_top + self.height * tile_height) or not (
-                mouse_pos[0] < Field.size_in_pixels[0] and mouse_pos[1] < Field.size_in_pixels[1]):
+        x_shift = min(0, cam.get_x_shift())
+        y_shift = min(0, cam.get_y_shift())
+        if not (Field.margin_left <= mouse_pos[0] + x_shift <= Field.margin_left + self.width * tile_width) or\
+           not (Field.margin_top <= mouse_pos[1] + y_shift <= Field.margin_top + self.height * tile_height) or\
+           not (mouse_pos[0] < Field.size_in_pixels[0] and mouse_pos[1] < Field.size_in_pixels[1]):
             return None
         return (mouse_pos[1] - Field.margin_top + cam.get_y_shift()) // tile_height, (
                 mouse_pos[0] - Field.margin_left + cam.get_x_shift()) // tile_width  # row col
@@ -325,7 +331,15 @@ class Field:  # Игровое поле
             if (last_row, last_col) == cell:
                 # Убираем стрелочки
                 arrow_sprites.empty()
+                self.field[last_row][last_col].content = None
+
                 for row, col in path[1:]:
+                    # Проверка столкновения с противником
+                    content = self.field[row][col].get_content()
+                    if type(content).__name__ == "Player":
+                        fight(selected_hero, content)
+                        break
+
                     prev_col, prev_row = selected_hero.get_pos()
                     k = 7  # Коэфиициент скорости движения
                     drow = (row - prev_row) * k  # delta rows (in pixels)
@@ -334,10 +348,10 @@ class Field:  # Игровое поле
                         selected_hero.set_reversed(dcol < 0)
                     prev_row *= tile_height
                     prev_col *= tile_width
-                    while not (row * tile_height - abs(drow) <= prev_row <= row * tile_height + abs(
-                            drow) and
-                               col * tile_width - abs(dcol) <= prev_col <= col * tile_width + abs(
-                                dcol)):
+                    while not (row * tile_height - abs(drow) <= prev_row
+                               <= row * tile_height + abs(drow) and
+                               col * tile_width - abs(dcol) <= prev_col
+                               <= col * tile_width + abs(dcol)):
                         for event in pygame.event.get():
                             if event.type == pygame.QUIT or (
                                     event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
@@ -347,7 +361,6 @@ class Field:  # Игровое поле
                         selected_hero.update('moving', dcol, drow)
 
                         # Взаимодейтсвие с предметами
-                        content = self.field[row][col].get_content()
                         if content is not None:
                             selected_hero.interact(content)
                             if type(content).__name__ == "Item":
@@ -363,17 +376,39 @@ class Field:  # Игровое поле
                         clock.tick(FPS)
                     selected_hero.move(col, row)
                     sel_her_col, sel_her_row = selected_hero.get_pos()
+
+                    # Двигаем камеру при необходимости
+                    if sel_her_row - cam.rows < 3:
+                        cam.upper(3 - (sel_her_row - cam.rows))
+                    elif sel_her_row - cam.rows > Field.row_count - 3:
+                        cam.lower(sel_her_row - cam.rows - (Field.row_count - 3))
+                    if sel_her_col - cam.cols < 3:
+                        cam.left(3 - (sel_her_col - cam.cols))
+                    elif sel_her_col - cam.cols > Field.col_count - 3:
+                        cam.right(sel_her_col - cam.cols - (Field.col_count - 3))
+
+                    screen.blit(black_texture, (0, 0))
+                    screen.blit(self.space, (Field.margin_right - cam.get_x_shift(),
+                                             Field.margin_top - cam.get_y_shift()))
+                    self.draw_frame()
+                    control_panel.draw()
+                    pygame.display.flip()
+                    clock.tick(FPS)
+
+                self.field[row][col].content = selected_hero
                 selected_hero.image = selected_hero.default_image
 
             else:
                 # Убираем старые стрелочки
                 arrow_sprites.empty()
                 # Рисуем стрелочки
+                previous_cell_backup = last_row, last_col  # На случай если в клетку не удастся попасть
                 last_row, last_col = cell
                 try:
                     path = networkx.shortest_path(self.Dg, str(sel_her_row) + ',' + str(sel_her_col),
                                                   str(last_row) + ',' + str(last_col), weight=1)
                 except networkx.NetworkXNoPath:
+                    last_row, last_col = previous_cell_backup
                     return
                 path = list(map(lambda x: list(map(int, x.split(','))), path))
                 for i, (row, col) in enumerate(path[1:-1], 1):
@@ -601,7 +636,7 @@ class HeroFightScreen:
             self.surface.blit(string, string_rect)
 
 
-def fight(left_hero, right_hero):  # TODO
+def fight(left_hero, right_hero):
     coor_row = [0, 1, 3, 4, 5, 7, 8]
     null_unit = Unit("player.png", "", 0, 0, 0, 0, 0, 0, 0, "", False)
     board = [[0] * 10 for _ in range(9)]
@@ -659,11 +694,6 @@ def fight(left_hero, right_hero):  # TODO
                 fight_board.get_click((x, y))
         pygame.display.flip()
         clock.tick(FPS)
-
-
-class Meet:  # TODO
-    def __init__(self, left_hero, right_hero):
-        pass
 
 
 class Player(pygame.sprite.Sprite):
@@ -728,7 +758,8 @@ class Player(pygame.sprite.Sprite):
             # который отвечает за предмет лежащий на поле
             self.inventory[self.inventory.index(Player.null_item)] = other
             # self.inventory[self.inventory.index(Player.null_item)] = Item(*other.stats())  # Что-то типа заглушки,
-            # которая превращает предмет, который лежит на полу в предмет, который в инвентаре героя TODO * 3
+            # которая превращает предмет, который лежит на полу в предмет, который в инвентаре героя
+            # TODO Player.interact
 
         elif type(other).__name__ == 'build':
             if other.variety != 'town':  # Опять заглушка
@@ -740,9 +771,6 @@ class Player(pygame.sprite.Sprite):
     def get_characteristics(self):
         return self.atc, self.dfc
 
-    # Два метода заглушки, которые ещё рано реализовывать, так как на карте даже двух героев то нет,
-    # а тут их взаимодействия и эт фронт уже (твоя работа), так что я иду нафиг Соре
-    # Тут наверно придется класс Fight писать TODO * 2
     def fight(self, other):
         pass
 
@@ -975,7 +1003,7 @@ def start_screen():
 start_screen()  # Main menu
 screen.fill(0xff0000)
 field = Field("example.txt", N)  # Игровое поле
-control_panel = ControlPanel()
+control_panel = ControlPanel(field)
 cam = Camera(field)
 black_texture = pygame.transform.scale(load_image('black-texture.png'), (WIDTH, HEIGHT))
 up_counter, down_counter, left_counter, right_counter = [None] * 4
