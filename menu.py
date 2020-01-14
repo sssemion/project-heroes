@@ -22,6 +22,40 @@ running = True
 tile_width = tile_height = 50
 
 
+class Camera:
+    def __init__(self, field):
+        self.rows, self.cols = 0, 0
+        self.field = field
+
+    def get_x_shift(self):
+        return self.cols * tile_width
+
+    def get_y_shift(self):
+        return self.rows * tile_height
+
+    def set_rows(self, rows):
+        self.rows = rows
+
+    def set_cols(self, cols):
+        self.cols = cols
+
+    def upper(self, delta=1):
+        self.rows -= delta
+        self.rows = max(-1, self.rows)
+
+    def lower(self, delta=1):
+        self.rows += delta
+        self.rows = min(self.field.height - 1, self.rows)
+
+    def left(self, delta=1):
+        self.cols -= delta
+        self.cols = max(-1, self.cols)
+
+    def right(self, delta=1):
+        self.cols += delta
+        self.cols = min(self.field.width - 1, self.cols)
+
+
 def terminate():
     pygame.quit()
     sys.exit()
@@ -75,33 +109,49 @@ class Item:
 # Библитека предметов
 ITEMS = {
     'club': Item('Дубина', 2, 0, "Мощная, но неудобная дубина огра", 'weapon', 'club'),
-    'darksword': Item('Зловещий меч', 4, 0, "Постаревший от времени меч мертвеца", 'weapon', 'darksword'),
+    'darksword': Item('Зловещий меч', 4, 0, "Постаревший от времени меч мертвеца", 'weapon',
+                      'darksword'),
     'mace': Item('Кистень', 8, 0, "Сделанный на славу кистень", 'weapon', 'mace'),
-    'titansword': Item('Меч титана', 12, -3, "Тяжелый меч, которым сложно защищаться", 'weapon', 'titansword'),
+    'titansword': Item('Меч титана', 12, -3, "Тяжелый меч, которым сложно защищаться", 'weapon',
+                       'titansword'),
 
     'poorshield': Item('Щит бедняка', 0, 2, "Щит мертвого оборванца", 'shield', 'poorshield'),
-    'darkshield': Item('Щит мертвеца', 0, 4, "Ржавый щит, украшенный черепом", 'shield', 'darkshield'),
-    'ironshield': Item('Щит 1000 гномьих судеб', 0, 8, "Щит, над которым старлся город гномов", 'shield', 'ironshield'),
-    'bestshield': Item('Щит печально павшего воина', -3, 12, "Щит последнего воина", 'shield', 'bestshield'),
+    'darkshield': Item('Щит мертвеца', 0, 4, "Ржавый щит, украшенный черепом", 'shield',
+                       'darkshield'),
+    'ironshield': Item('Щит 1000 гномьих судеб', 0, 8, "Щит, над которым старлся город гномов",
+                       'shield', 'ironshield'),
+    'bestshield': Item('Щит печально павшего воина', -3, 12, "Щит последнего воина", 'shield',
+                       'bestshield'),
 
-    'crownhelm': Item('Корона', 0, 2, "Корона, которая лучше смотрится на королях", 'helm', 'crownhelm'),
+    'crownhelm': Item('Корона', 0, 2, "Корона, которая лучше смотрится на королях", 'helm',
+                      'crownhelm'),
     'darkhelm': Item('Мертвецкий шлем', 0, 4, "Шлем умершего короля мертвых", 'helm', 'darkhelm'),
     'skullhelm': Item('Шлем-череп', 8, -2, "Проклятый (?) богами шлем", 'helm', 'skullhelm'),
-    'hornhelm': Item('Шлем стада единорогов', 10, 8, "Шлем с трофеями стального единорога", 'helm', 'hornhelm'),
+    'hornhelm': Item('Шлем стада единорогов', 10, 8, "Шлем с трофеями стального единорога", 'helm',
+                     'hornhelm'),
 
-    'darkboots': Item('Боты обмана', -2, -6, "Ботинки обманщика-марафонца", 'boots', 'darkboots', {'bonus_move': 500}),
+    'darkboots': Item('Боты обмана', -2, -6, "Ботинки обманщика-марафонца", 'boots', 'darkboots',
+                      {'bonus_move': 500}),
     'saintboots': Item('Сандали Мироздателя', 4, 4, "Сандали Мироздателя", 'boots', 'saintboots'),
-    'speedboots': Item('Скороходы', 0, 0, "Ботинки из душ лошадей", 'boots', 'speedboots', {'bonus_move': 1500}),
-    'boneboots': Item('Ботинки погребенных', 2, 2, "Поножи из костей невинных рабов", 'boots', 'boneboots'),
+    'speedboots': Item('Скороходы', 0, 0, "Ботинки из душ лошадей", 'boots', 'speedboots',
+                       {'bonus_move': 1500}),
+    'boneboots': Item('Ботинки погребенных', 2, 2, "Поножи из костей невинных рабов", 'boots',
+                      'boneboots'),
 
-    'poorchest': Item('Школьный нагрудник', 2, 6, "Нагрудник ученика школы наездников", 'chest', 'poorchest'),
+    'poorchest': Item('Школьный нагрудник', 2, 6, "Нагрудник ученика школы наездников", 'chest',
+                      'poorchest'),
     'firechest': Item('Кираса огня', 4, 9, "Кираса адского пламени", 'chest', 'firechest'),
-    'goldchest': Item('Праздничный наряд', 8, 14, "Торжественное одеяние циклопов по праздникам", 'chest', 'goldchest'),
-    'titanchest': Item('Титаноывй нагрудник', 12, 20, "Нагрудник Герерала Титанов", 'chest', 'titanchest'),
+    'goldchest': Item('Праздничный наряд', 8, 14, "Торжественное одеяние циклопов по праздникам",
+                      'chest', 'goldchest'),
+    'titanchest': Item('Титаноывй нагрудник', 12, 20, "Нагрудник Герерала Титанов", 'chest',
+                       'titanchest'),
 
-    'speedglove': Item('Конные перчатки', 0, 0, "Перчатки скорой дикости", 'other', 'glovespeed', {'bonus_move': 500}),
-    'rib': Item('Лента дипломата', 0, 0, "Лента дипломата. Все идут за вами", 'other', 'rib', {'sale': 1}),
-    'costring': Item('Лента дипломата', 0, 0, "Кольцо дипломата. Все идут за вами", 'other', 'ringcost', {'sale': 1}),
+    'speedglove': Item('Конные перчатки', 0, 0, "Перчатки скорой дикости", 'other', 'glovespeed',
+                       {'bonus_move': 500}),
+    'rib': Item('Лента дипломата', 0, 0, "Лента дипломата. Все идут за вами", 'other', 'rib',
+                {'sale': 1}),
+    'costring': Item('Лента дипломата', 0, 0, "Кольцо дипломата. Все идут за вами", 'other',
+                     'ringcost', {'sale': 1}),
 }
 
 
@@ -138,15 +188,18 @@ class Cell:  # Ячейка поля Field
 
 class ControlPanel:  # Панель управления в правой части экрана
     width = 200  # px
+    backgroung = pygame.transform.scale(load_image("control-panel-background.jpg"), (width, HEIGHT))
 
+    def __init__(self):
+        screen.blit(ControlPanel.backgroung, (WIDTH - ControlPanel.width, 0))
 
-class ResourcePanel:  # Панель ресурсов в нижней части экрана
-    height = 40  # px
+    def draw(self):
+        screen.blit(ControlPanel.backgroung, (WIDTH - ControlPanel.width, 0))
 
 
 class Field:  # Игровое поле
-    size_in_pixels = WIDTH - ControlPanel.width, HEIGHT - ResourcePanel.height
-    margin_top = int(15 / 732 * size_in_pixels[1])
+    size_in_pixels = WIDTH - ControlPanel.width, HEIGHT
+    margin_top = int(14 / 732 * size_in_pixels[1])
     margin_right = int(13 / 1171 * size_in_pixels[0])
     margin_left = int(15 / 1171 * size_in_pixels[0])
     margin_bottom = int(16 / 732 * size_in_pixels[1])
@@ -214,10 +267,8 @@ class Field:  # Игровое поле
         self.frame = pygame.transform.scale(load_image('frame.png'), Field.size_in_pixels)
         screen.blit(self.frame, (0, 0))
         w, h = self.frame.get_size()
-        self.space = pygame.Surface((w - Field.margin_right - Field.margin_left,
-                                     h - Field.margin_top - Field.margin_bottom))
-        self.space.blit(
-            pygame.transform.scale(load_image('black-texture.png'), (w, w)), (0, 0))
+        self.space = pygame.Surface((self.width * tile_width,
+                                     self.height * tile_height))
 
         for x in range(self.height):
             for y in range(self.width):
@@ -263,8 +314,8 @@ class Field:  # Игровое поле
             1] <= Field.margin_top + self.height * tile_height) or not (
                 mouse_pos[0] < Field.size_in_pixels[0] and mouse_pos[1] < Field.size_in_pixels[1]):
             return None
-        return (mouse_pos[1] - Field.margin_top) // tile_height, (
-                mouse_pos[0] - Field.margin_left) // tile_width  # row col
+        return (mouse_pos[1] - Field.margin_top + cam.get_y_shift()) // tile_height, (
+                mouse_pos[0] - Field.margin_left + cam.get_x_shift()) // tile_width  # row col
 
     def on_click(self, cell, action):
         global sel_her_col, sel_her_row, last_row, last_col, selected_hero, path
@@ -305,7 +356,9 @@ class Field:  # Игровое поле
 
                         tile_sprites.draw(self.space)
                         player_sprites.draw(self.space)
-                        screen.blit(self.space, (Field.margin_right, Field.margin_top))
+                        screen.blit(self.space, (Field.margin_right - cam.get_x_shift(),
+                                                 Field.margin_top - cam.get_y_shift()))
+                        self.draw_frame()
                         pygame.display.flip()
                         clock.tick(FPS)
                     selected_hero.move(col, row)
@@ -369,9 +422,13 @@ class Field:  # Игровое поле
                 selected_hero = self.field[cell[0]][cell[1]].content
         # print(sel_her_row, sel_her_col, last_row, last_col)
 
+    def draw_frame(self):  # перерисовывает рамочку вокруг поля
+        screen.blit(self.frame, (0, 0))
+
 
 class Unit(pygame.sprite.Sprite):
-    def __init__(self, image, name, attack, defence, min_dmg, max_dmg, count, speed, hp, team, shoot):
+    def __init__(self, image, name, attack, defence, min_dmg, max_dmg, count, speed, hp, team,
+                 shoot):
         super().__init__(unit_sprites)
         self.image = load_image(image)
         self.dead = 0
@@ -462,21 +519,27 @@ class FightBoard:
         self.rows = self.cols = 0
         self.cell_width = self.cell_height = 0
         self.surface = pygame.Surface((width, height))
-        self.surface.blit(pygame.transform.scale(load_image('fight-background.jpg'), (width, height)), (0, 0))
+        self.surface.blit(
+            pygame.transform.scale(load_image('fight-background.jpg'), (width, height)), (0, 0))
 
     def draw_cells(self):
         self.rows = len(self.board)
         self.cols = len(self.board[0])
-        self.cell_width = (self.width - FightBoard.margin_left - FightBoard.margin_right) // self.cols
-        self.cell_height = (self.height - FightBoard.margin_top - FightBoard.margin_bottom) // self.rows
-        cells_surface = pygame.Surface((self.width - FightBoard.margin_left - FightBoard.margin_right + 2,
-                                        self.height - FightBoard.margin_top - FightBoard.margin_bottom + 2))
+        self.cell_width = (
+                                  self.width - FightBoard.margin_left - FightBoard.margin_right) // self.cols
+        self.cell_height = (
+                                   self.height - FightBoard.margin_top - FightBoard.margin_bottom) // self.rows
+        cells_surface = pygame.Surface(
+            (self.width - FightBoard.margin_left - FightBoard.margin_right + 2,
+             self.height - FightBoard.margin_top - FightBoard.margin_bottom + 2))
         for i in range(self.rows + 1):
             pygame.draw.line(cells_surface, 0xffffff, (0, i * self.cell_height),
-                             (self.width - FightBoard.margin_right - FightBoard.margin_left, i * self.cell_height), 2)
+                             (self.width - FightBoard.margin_right - FightBoard.margin_left,
+                              i * self.cell_height), 2)
         for i in range(self.cols + 1):
             pygame.draw.line(cells_surface, 0xffffff, (i * self.cell_width, 0),
-                             (i * self.cell_width, self.height - FightBoard.margin_top - FightBoard.margin_bottom), 2)
+                             (i * self.cell_width,
+                              self.height - FightBoard.margin_top - FightBoard.margin_bottom), 2)
         cells_surface.set_colorkey(0x000000)
         cells_surface.set_alpha(128)
         self.surface.blit(cells_surface, (FightBoard.margin_right, FightBoard.margin_top))
@@ -488,7 +551,8 @@ class FightBoard:
     def get_cell(self, mouse_pos):
         if not (FightBoard.margin_left <= mouse_pos[
             0] <= FightBoard.margin_left + self.width * self.cell_width) or not (
-                FightBoard.margin_top <= mouse_pos[1] <= FightBoard.margin_top + self.height * self.cell_height):
+                FightBoard.margin_top <= mouse_pos[
+            1] <= FightBoard.margin_top + self.height * self.cell_height):
             return None
         return (mouse_pos[1] - FightBoard.margin_top) // self.cell_height, (
                 mouse_pos[0] - FightBoard.margin_left) // self.cell_width
@@ -504,7 +568,8 @@ class HeroFightScreen:
     def __init__(self, hero, right=False):
         self.surface = pygame.Surface((HeroFightScreen.width, HeroFightScreen.height))
         self.surface.blit(pygame.transform.scale(load_image('fight-hero-background.jpg'),
-                                                 (HeroFightScreen.width, HeroFightScreen.height)), (0, 0))
+                                                 (HeroFightScreen.width, HeroFightScreen.height)),
+                          (0, 0))
         self.hero = hero
         self.right = right
         self.img_height = 0
@@ -569,7 +634,8 @@ def fight(left_hero, right_hero):  # TODO
     left_hero_screen = HeroFightScreen(left_hero)
     left_hero_screen.draw_image()
     left_hero_screen.draw_text()
-    screen.blit(left_hero_screen.surface, (topleft_coord[0] - HeroFightScreen.width - 5, topleft_coord[1]))
+    screen.blit(left_hero_screen.surface,
+                (topleft_coord[0] - HeroFightScreen.width - 5, topleft_coord[1]))
 
     right_hero_screen = HeroFightScreen(right_hero, right=True)
     right_hero_screen.draw_image()
@@ -601,7 +667,7 @@ class Meet:  # TODO
 
 
 class Player(pygame.sprite.Sprite):
-    default_image = load_image('player.png', -1)
+    default_image = pygame.transform.scale(load_image('player.png', -1), (tile_width, tile_height))
     null_item = Item("", 0, 0, "all", "")
     null_unit = Unit("player.png", "", 0, 0, 0, 0, 0, 0, 0, "", False)
     moving_animation = itertools.cycle(
@@ -612,7 +678,7 @@ class Player(pygame.sprite.Sprite):
     def __init__(self, pos_y, pos_x, team):
         super().__init__(player_sprites)
         self.team = team
-        self.image = pygame.transform.scale(self.default_image, (tile_width, tile_height))
+        self.image = self.default_image.copy()
         self.original_image = self.image.copy()
         self.rect = self.image.get_rect().move(tile_width * pos_x,
                                                tile_height * pos_y)
@@ -685,10 +751,11 @@ class Player(pygame.sprite.Sprite):
 
     def render(self, *args):  # рисует кружочек возле героя чтобы различать разные команды
         x, y = self.get_pos()
-        pygame.draw.ellipse(self.image, pygame.color.Color(self.team), pygame.Rect(int(tile_width * 0.35),
-                                                                                   int(tile_height * 0.75),
-                                                                                   int(tile_width * 0.3),
-                                                                                   int(tile_height * 0.2)))
+        pygame.draw.ellipse(self.image, pygame.color.Color(self.team),
+                            pygame.Rect(int(tile_width * 0.35),
+                                        int(tile_height * 0.75),
+                                        int(tile_width * 0.3),
+                                        int(tile_height * 0.2)))
 
     def update(self, updating_type='', *args):
         if updating_type:
@@ -716,8 +783,8 @@ class Tile(pygame.sprite.Sprite):
         'bestshield': load_image("items/bestshield-floor.png", -1),
         'boneboots': load_image("items/boneboots-floor.png", -1),
         'club': load_image("items/club-floor.png", -1),
-        'costrib': load_image("items/costrib-floor.png", -1),
-        'costring': load_image("items/costring-floor.png", -1),
+        'costrib': load_image("items/rib-floor.png", -1),
+        'costring': load_image("items/ringcost-floor.png", -1),
         'crownhelm': load_image("items/crownhelm-floor.png", -1),
         'darkboots': load_image("items/darkboots-floor.png", -1),
         'darkhelm': load_image("items/darkhelm-floor.png", -1),
@@ -725,7 +792,7 @@ class Tile(pygame.sprite.Sprite):
         'darksword': load_image("items/darksword-floor.png"),
         'firechest': load_image("items/firechest-floor.png", -1),
         'goldchest': load_image("items/goldchest-floor.png", -1),
-        'hornhelm': load_image("items/hornhelm-floor.png", -1),
+        'hornhelm': load_image("items/hormhelm-floor.png", -1),
         'ironshield': load_image("items/ironshield-floor.png", -1),
         'mace': load_image("items/mace-floor.png", -1),
         'poorchest': load_image("items/poorchest-floor.png", -1),
@@ -733,7 +800,7 @@ class Tile(pygame.sprite.Sprite):
         'saintboots': load_image("items/saintboots-floor.png", -1),
         'skullhelm': load_image("items/skullhelm-floor.png", -1),
         'speedboots': load_image("items/speedboots-floor.png", -1),
-        'speedglove': load_image("items/speedglove-floor.png", -1),
+        'speedglove': load_image("items/glovespeed-floor.png", -1),
         'titanchest': load_image("items/titanchest-floor.png", -1),
         'titansword': load_image("items/titansword-floor.png", -1),
         'grass': load_image("grass.png"),
@@ -878,13 +945,15 @@ def start_screen():
     start_button.set_text("Start", font, pygame.color.Color(156, 130, 79))
     start_button.render()
 
-    settings_button = Button(button_sprites, screen, (WIDTH - bwidth) // 2, (HEIGHT - bheight) // 2, bwidth,
+    settings_button = Button(button_sprites, screen, (WIDTH - bwidth) // 2, (HEIGHT - bheight) // 2,
+                             bwidth,
                              bheight)
     settings_button.set_background_image('button-background.jpg')
     settings_button.set_text("Settings", font, pygame.color.Color(156, 130, 79))
     settings_button.render()
 
-    exit_button = Button(button_sprites, screen, (WIDTH - bwidth) // 2, (HEIGHT + bheight * 2) // 2, bwidth,
+    exit_button = Button(button_sprites, screen, (WIDTH - bwidth) // 2, (HEIGHT + bheight * 2) // 2,
+                         bwidth,
                          bheight, terminate)
     exit_button.set_background_image('button-background.jpg')
     exit_button.set_text("Exit", font, pygame.color.Color(32, 32, 32))
@@ -895,7 +964,8 @@ def start_screen():
             if event.type == pygame.QUIT or (
                     event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                 terminate()
-            if start_button.clicked or (event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN):
+            if start_button.clicked or (
+                    event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN):
                 return
             button_sprites.update(event)
         pygame.display.flip()
@@ -905,6 +975,13 @@ def start_screen():
 start_screen()  # Main menu
 screen.fill(0xff0000)
 field = Field("example.txt", N)  # Игровое поле
+control_panel = ControlPanel()
+cam = Camera(field)
+black_texture = pygame.transform.scale(load_image('black-texture.png'), (WIDTH, HEIGHT))
+up_counter, down_counter, left_counter, right_counter = [None] * 4
+ctrl_pressed = False
+hold_timeout = 5  # задержка после зажатия кнопки
+hold_speed = 30  # задержка между повторениями зажатых кнопок
 
 while running:
     for event in pygame.event.get():
@@ -912,14 +989,71 @@ while running:
                 event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
             terminate()
         elif event.type == pygame.KEYDOWN:
-            pass
+            if event.key == pygame.K_LCTRL:
+                ctrl_pressed = True
+            if event.key == pygame.K_UP:
+                up_counter = -hold_timeout  # Устанавливаем задержку по врмемни
+                # на циклическое повторение при зажатии
+                cam.upper()  # Двигаем камеру
+            if event.key == pygame.K_DOWN:
+                down_counter = -hold_timeout
+                cam.lower()
+            if event.key == pygame.K_LEFT:
+                left_counter = -hold_timeout
+                cam.left()
+            if event.key == pygame.K_RIGHT:
+                right_counter = -hold_timeout
+                cam.right()
+        elif event.type == pygame.KEYUP:
+            if event.key == pygame.K_LCTRL:
+                ctrl_pressed = False
+            if event.key == pygame.K_UP:
+                up_counter = None
+            if event.key == pygame.K_DOWN:
+                down_counter = None
+            if event.key == pygame.K_LEFT:
+                left_counter = None
+            if event.key == pygame.K_RIGHT:
+                right_counter = None
+            if event.key == pygame.KMOD_CTRL:
+                ctrl_pressed = False
         elif event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1 or event.button == 3:
                 field.get_click(event)
-    all_sprites.draw(screen)
+            if event.button == 4:
+                if ctrl_pressed:
+                    cam.left()
+                else:
+                    cam.upper()
+            if event.button == 5:
+                if ctrl_pressed:
+                    cam.right()
+                else:
+                    cam.lower()
+
+    # Увеличиваем счетчик зажатых клавиш (если они зажаты)
+    if up_counter is not None:
+        up_counter += 1
+        cam.upper(up_counter // hold_speed > 0)
+    if down_counter is not None:
+        down_counter += 1
+        cam.lower(down_counter // hold_speed > 0)
+    if left_counter is not None:
+        left_counter += 1
+        cam.left(left_counter // hold_speed > 0)
+    if right_counter is not None:
+        right_counter += 1
+        cam.right(right_counter // hold_speed > 0)
+
+    screen.blit(black_texture, (0, 0))
+
+    # all_sprites.draw(screen)
     tile_sprites.draw(field.space)
     arrow_sprites.draw(field.space)
     player_sprites.draw(field.space)
-    screen.blit(field.space, (Field.margin_right, Field.margin_top))
+    screen.blit(field.space, (Field.margin_right - cam.get_x_shift(),
+                              Field.margin_top - cam.get_y_shift()))
+    field.draw_frame()
+    control_panel.draw()
     pygame.display.flip()
     clock.tick(FPS)
