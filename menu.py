@@ -185,20 +185,47 @@ class Cell:  # Ячейка поля Field
         except AttributeError:
             pass
 
+    def get_minimap_color(self):
+        if self.content is None:
+            return 0x008000
+        elif type(self.content).__name__ == "Item":
+            return 0xffd700
+        elif type(self.content).__name__ == "Player":
+            return 0xff0000
+        elif type(self.content).__name__ == "Block":
+            return 0x454545
+
+
 
 class ControlPanel:  # Панель управления в правой части экрана
     width = 200  # px
     backgroung = pygame.transform.scale(load_image("control-panel-background.jpg"), (width, HEIGHT))
 
     def __init__(self, field):
-        screen.blit(ControlPanel.backgroung, (WIDTH - ControlPanel.width, 0))
         self.field = field
+        self.surface = pygame.Surface((self.width, HEIGHT))
+        self.surface.blit(self.backgroung, (0, 0))
+        self.render_minimap()
 
     def draw(self):
-        screen.blit(ControlPanel.backgroung, (WIDTH - ControlPanel.width, 0))
+        map = self.render_minimap()
+        self.surface.blit(map, ((self.width - map.get_width()) // 2, 8))
+        screen.blit(self.surface, (WIDTH - self.width, 0))
 
     def render_minimap(self):
-        pass
+        width, height = self.field.width, self.field.height
+        frame_size = 2
+        cell_size = min((self.width - 16) // width, 250 // height)
+        w, h = cell_size * width + frame_size * 2, cell_size * height + frame_size * 2
+        surface = pygame.Surface((w, h))
+        pygame.draw.rect(surface, 0xe7daae, (0, 0, w - 1, h - 1), 2)
+        for row in range(height):
+            for col in range(width):
+                color = self.field.field[row][col].get_minimap_color()
+                pygame.draw.rect(surface, color, (cell_size * col + frame_size,
+                                                  cell_size * row + frame_size,
+                                                  cell_size, cell_size))
+        return surface
     # TODO minimap
 
 
@@ -331,14 +358,8 @@ class Field:  # Игровое поле
             if (last_row, last_col) == cell:
                 # Убираем стрелочки
                 arrow_sprites.empty()
-                self.field[last_row][last_col].content = None
 
                 for row, col in path[1:]:
-                    # Проверка столкновения с противником
-                    content = self.field[row][col].get_content()
-                    if type(content).__name__ == "Player":
-                        fight(selected_hero, content)
-                        break
 
                     prev_col, prev_row = selected_hero.get_pos()
                     k = 7  # Коэфиициент скорости движения
@@ -360,13 +381,6 @@ class Field:  # Игровое поле
                         prev_col += dcol
                         selected_hero.update('moving', dcol, drow)
 
-                        # Взаимодейтсвие с предметами
-                        if content is not None:
-                            selected_hero.interact(content)
-                            if type(content).__name__ == "Item":
-                                self.field[row][col].content = None
-                                self.field[row][col].render(row, col)
-
                         tile_sprites.draw(self.space)
                         player_sprites.draw(self.space)
                         screen.blit(self.space, (Field.margin_right - cam.get_x_shift(),
@@ -375,6 +389,14 @@ class Field:  # Игровое поле
                         pygame.display.flip()
                         clock.tick(FPS)
                     selected_hero.move(col, row)
+
+                    # Взаимодейтсвие с предметами
+                    content = self.field[row][col].get_content()
+                    if content is not None:
+                        selected_hero.interact(content)
+
+                    self.field[row][col].content = selected_hero
+                    self.field[sel_her_row][sel_her_col].content = None
                     sel_her_col, sel_her_row = selected_hero.get_pos()
 
                     # Двигаем камеру при необходимости
@@ -395,7 +417,6 @@ class Field:  # Игровое поле
                     pygame.display.flip()
                     clock.tick(FPS)
 
-                self.field[row][col].content = selected_hero
                 selected_hero.image = selected_hero.default_image
 
             else:
@@ -455,6 +476,7 @@ class Field:  # Игровое поле
             if type(self.field[cell[0]][cell[1]].content).__name__ == 'Player':
                 sel_her_row, sel_her_col = cell[0], cell[1]
                 selected_hero = self.field[cell[0]][cell[1]].content
+                last_row, last_col = -1, -1
         # print(sel_her_row, sel_her_col, last_row, last_col)
 
     def draw_frame(self):  # перерисовывает рамочку вокруг поля
@@ -747,19 +769,15 @@ class Player(pygame.sprite.Sprite):
         return False
 
     def interact(self, other):
-        if type(other).__name__ == 'Hero':
+        if type(other).__name__ == 'Player':
             if other.team != self.team:
-                self.fight(other)
-                return
-            if other.team == self.team:
-                self.meet(other)
-                return
-        elif type(other).__name__ == 'Item':  # А тут вписать то что будет в этом классе,
-            # который отвечает за предмет лежащий на поле
-            self.inventory[self.inventory.index(Player.null_item)] = other
-            # self.inventory[self.inventory.index(Player.null_item)] = Item(*other.stats())  # Что-то типа заглушки,
-            # которая превращает предмет, который лежит на полу в предмет, который в инвентаре героя
-            # TODO Player.interact
+                fight(self, other)
+        elif type(other).__name__ == 'Item':
+            if Player.null_item in self.inventory:
+                self.inventory[self.inventory.index(Player.null_item)] = other
+                row, col = self.get_pos()[::-1]
+                field.field[row][col].content = None
+                field.field[row][col].render(row, col)
 
         elif type(other).__name__ == 'build':
             if other.variety != 'town':  # Опять заглушка
@@ -770,12 +788,6 @@ class Player(pygame.sprite.Sprite):
 
     def get_characteristics(self):
         return self.atc, self.dfc
-
-    def fight(self, other):
-        pass
-
-    def meet(self, other):
-        pass
 
     def render(self, *args):  # рисует кружочек возле героя чтобы различать разные команды
         x, y = self.get_pos()
