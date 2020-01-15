@@ -2,6 +2,7 @@ import itertools
 import os
 import random
 import sys
+
 import networkx
 import pygame
 
@@ -196,13 +197,13 @@ class Cell:  # Ячейка поля Field
             return 0x454545
 
 
-
 class ControlPanel:  # Панель управления в правой части экрана
     width = 200  # px
     backgroung = pygame.transform.scale(load_image("control-panel-background.jpg"), (width, HEIGHT))
 
-    def __init__(self, field):
+    def __init__(self, field, cam):
         self.field = field
+        self.cam = cam
         self.surface = pygame.Surface((self.width, HEIGHT))
         self.surface.blit(self.backgroung, (0, 0))
         self.render_minimap()
@@ -218,15 +219,22 @@ class ControlPanel:  # Панель управления в правой час�
         cell_size = min((self.width - 16) // width, 250 // height)
         w, h = cell_size * width + frame_size * 2, cell_size * height + frame_size * 2
         surface = pygame.Surface((w, h))
-        pygame.draw.rect(surface, 0xe7daae, (0, 0, w - 1, h - 1), 2)
         for row in range(height):
             for col in range(width):
                 color = self.field.field[row][col].get_minimap_color()
                 pygame.draw.rect(surface, color, (cell_size * col + frame_size,
                                                   cell_size * row + frame_size,
                                                   cell_size, cell_size))
+
+        # обозначаем область, видимую на экране
+        pygame.draw.rect(surface, 0xff0000, (self.cam.cols * cell_size + frame_size,
+                                             self.cam.rows * cell_size + frame_size,
+                                             cell_size * self.field.col_count,
+                                             cell_size * self.field.row_count), 1)
+
+        # рисуем рамочку
+        pygame.draw.rect(surface, 0xe7daae, (0, 0, w - 1, h - 1), 2)
         return surface
-    # TODO minimap
 
 
 class Field:  # Игровое поле
@@ -235,6 +243,8 @@ class Field:  # Игровое поле
     margin_right = int(13 / 1171 * size_in_pixels[0])
     margin_left = int(15 / 1171 * size_in_pixels[0])
     margin_bottom = int(16 / 732 * size_in_pixels[1])
+
+    # сколько строк и столбцов помещается на экране
     row_count = (size_in_pixels[1] - margin_top - margin_bottom) // tile_height
     col_count = (size_in_pixels[0] - margin_left - margin_right) // tile_width
 
@@ -343,9 +353,12 @@ class Field:  # Игровое поле
     def get_cell(self, mouse_pos):
         x_shift = min(0, cam.get_x_shift())
         y_shift = min(0, cam.get_y_shift())
-        if not (Field.margin_left <= mouse_pos[0] + x_shift <= Field.margin_left + self.width * tile_width) or\
-           not (Field.margin_top <= mouse_pos[1] + y_shift <= Field.margin_top + self.height * tile_height) or\
-           not (mouse_pos[0] < Field.size_in_pixels[0] and mouse_pos[1] < Field.size_in_pixels[1]):
+        if not (Field.margin_left <= mouse_pos[
+            0] + x_shift <= Field.margin_left + self.width * tile_width) or \
+                not (Field.margin_top <= mouse_pos[
+                    1] + y_shift <= Field.margin_top + self.height * tile_height) or \
+                not (mouse_pos[0] < Field.size_in_pixels[0] and mouse_pos[1] < Field.size_in_pixels[
+                    1]):
             return None
         return (mouse_pos[1] - Field.margin_top + cam.get_y_shift()) // tile_height, (
                 mouse_pos[0] - Field.margin_left + cam.get_x_shift()) // tile_width  # row col
@@ -1015,8 +1028,8 @@ def start_screen():
 start_screen()  # Main menu
 screen.fill(0xff0000)
 field = Field("example.txt", N)  # Игровое поле
-control_panel = ControlPanel(field)
 cam = Camera(field)
+control_panel = ControlPanel(field, cam)
 black_texture = pygame.transform.scale(load_image('black-texture.png'), (WIDTH, HEIGHT))
 up_counter, down_counter, left_counter, right_counter = [None] * 4
 ctrl_pressed = False
