@@ -81,6 +81,7 @@ tile_sprites = pygame.sprite.Group()
 player_sprites = pygame.sprite.Group()
 unit_sprites = pygame.sprite.Group()
 arrow_sprites = pygame.sprite.Group()
+inputbox_sprites = pygame.sprite.Group()
 
 
 class Item:
@@ -105,6 +106,26 @@ class Item:
 
     def stats(self):
         return self.name, self.d_atc, self.d_dfc, self.description, self.feature
+
+
+class Map:
+    def __init__(self, filename, name, description):
+        self.filename = "data/maps/" + filename
+        self.name = name
+        self.description = description
+
+    def load(self):
+        with open(self.filename, 'r') as mapFile:
+            level_map = [line.strip() for line in mapFile]
+        max_width = max(map(len, level_map))
+        # дополняем каждую строку пустыми клетками ('.')
+        return list(map(lambda x: list(x.ljust(max_width, '.')), level_map))
+
+    def get_name(self):
+        return self.name
+
+    def get_description(self):
+        return self.description
 
 
 # Библитека предметов
@@ -153,6 +174,11 @@ ITEMS = {
                 {'sale': 1}),
     'costring': Item('Лента дипломата', 0, 0, "Кольцо дипломата. Все идут за вами", 'other',
                      'ringcost', {'sale': 1}),
+}
+
+# Библиотека карт
+MAPS = {
+    'example': Map('example.txt', "Пример", "Просто карта для тестирования"),
 }
 
 
@@ -237,6 +263,7 @@ class ControlPanel:  # Панель управления в правой час�
         return surface
 
 
+# TODO: сохранение игры (хотя бы 1, чтобы можно было продолжить после выхода)
 class Field:  # Игровое поле
     size_in_pixels = WIDTH - ControlPanel.width, HEIGHT
     margin_top = int(14 / 732 * size_in_pixels[1])
@@ -248,14 +275,10 @@ class Field:  # Игровое поле
     row_count = (size_in_pixels[1] - margin_top - margin_bottom) // tile_height
     col_count = (size_in_pixels[0] - margin_left - margin_right) // tile_width
 
-    def __init__(self, filename, number_of_players=1):
+    def __init__(self, map_obj, number_of_players=1):
         self.Dg = networkx.DiGraph()
-        filename = "data/maps/" + filename
-        with open(filename, 'r') as mapFile:
-            level_map = [line.strip() for line in mapFile]
-        max_width = max(map(len, level_map))
-        # дополняем каждую строку пустыми клетками ('.')
-        self.field = list(map(lambda x: list(x.ljust(max_width, '.')), level_map))
+        self.map = map_obj
+        self.field = map_obj.load()
         self.width = len(self.field[0])
         self.height = len(self.field)
         self.players = {}
@@ -911,9 +934,8 @@ class Arrow(pygame.sprite.Sprite):
 
 
 class Button(pygame.sprite.Sprite):
-    def __init__(self, group, surface, x, y, width, height, function=lambda: None):
+    def __init__(self, group, x, y, width, height, function=lambda: None):
         super().__init__(group)
-        self.surface = surface
         self.x, self.y = x, y
         self.width, self.height = width, height
         self.function = function
@@ -921,6 +943,7 @@ class Button(pygame.sprite.Sprite):
         self.bgimage = None
         self.hovered = False
         self.clicked = False
+        self.rect = pygame.rect.Rect(x, y, width, height)
 
     def on_click(self, event):
         if self.x < event.pos[0] < self.x + self.width \
@@ -970,10 +993,6 @@ class Button(pygame.sprite.Sprite):
             black.set_alpha(32 + 32 * self.clicked)
             self.image.blit(black, (0, 0))
 
-        self.rect = self.image.get_rect()
-        self.rect.x = self.x
-        self.rect.y = self.y
-
         try:
             rendered = self.font.render(self.text, True, self.textcolor)
             w, h = rendered.get_size()
@@ -981,35 +1000,119 @@ class Button(pygame.sprite.Sprite):
         except AttributeError:
             print('error')
 
-        self.surface.blit(self.image, (self.x, self.y))
+        # self.surface.blit(self.image, (self.x, self.y))
 
 
+class InputBox(pygame.sprite.Sprite):
+    def __init__(self, group, x, y, width, height, placeholder='',
+                 font=pygame.font.Font('data/16478.otf', 24)):
+        super().__init__(group)
+        self.x, self.y = x, y
+        self.width, self.height = width, height
+        self.placeholder = placeholder
+        self.font = font
+        self.bgcolor = pygame.color.Color(105, 105, 105)
+        self.bgimage = None
+        self.active = False
+        self.enabled = True
+        self.text = ''
+        self.rect = pygame.rect.Rect(x, y, width, height)
+
+    def on_click(self, event):
+        self.active = False
+        if self.enabled and self.x < event.pos[0] < self.x + self.width \
+                and self.y < event.pos[1] < self.y + self.height:
+            self.active = True
+
+    def set_placeholder_text(self, placeholder):
+        self.placeholder = placeholder
+
+    def set_enabled(self, enabled):
+        self.enabled = enabled
+        if not enabled:
+            self.text = ''
+
+    def set_background_image(self, filename):
+        self.bgimage = load_image(filename)
+        self.bgimage = pygame.transform.scale(self.bgimage, (self.width, self.height))
+
+    def set_background_color(self, color: pygame.Color):
+        self.bgcolor = color
+
+    def on_keydown(self, event):
+        if event.key == pygame.K_RETURN:
+            self.active = False
+        elif event.key == pygame.K_BACKSPACE:
+            self.text = self.text[:-1]
+        else:
+            self.text += event.unicode
+
+    def update(self, *args):
+        for arg in args:
+            if arg.type == pygame.MOUSEBUTTONDOWN:
+                self.on_click(arg)
+            elif self.active and arg.type == pygame.KEYDOWN:
+                self.on_keydown(arg)
+        self.render()
+
+    def render(self):
+        self.image = pygame.Surface([self.width, self.height], flags=pygame.SRCALPHA)
+        if self.bgimage is not None:
+            self.image.blit(self.bgimage, (0, 0))
+        else:
+            self.image.fill(self.bgcolor)
+            pygame.draw.rect(self.image, pygame.color.Color(0xe7, 0xda, 0xae, 255),
+                             (0, 0, self.image.get_width(),
+                              self.image.get_height()), 1)
+
+        rendered = self.font.render(self.text if self.text else self.placeholder, True,
+                                    pygame.color.Color(0xe7, 0xda, 0xae) if self.text
+                                    else pygame.color.Color(128, 128, 128))
+        w, h = rendered.get_size()
+        self.image.blit(rendered, ((self.width - w) // 2, (self.height - h) // 2))
+
+        if not self.enabled:
+            black = pygame.Surface((self.width, self.height))
+            black.fill(pygame.Color(0, 0, 0))
+            black.set_alpha(150)
+            self.image.blit(black, (0, 0))
+        if self.active:
+            pygame.draw.rect(self.image, pygame.color.Color(0xe7, 0xda, 0xae, 255),
+                             (0, 0, self.image.get_width() - 1, self.image.get_height() - 1), 2)
+        # self.surface.blit(self.image, (self.x, self.y))
+
+
+# Стартовый экран
 def start_screen():
     fon = pygame.transform.scale(load_image('background.jpg'), (WIDTH, HEIGHT))
     screen.blit(fon, (0, 0))
 
-    bwidth, bheight = 400, 80
+    bwidth, bheight = 480, 100
 
-    font = pygame.font.Font(None, 80)
+    font = pygame.font.Font('data/16478.otf', 60)
 
-    start_button = Button(button_sprites, screen, (WIDTH - bwidth) // 2, (HEIGHT - bheight * 4) // 2,
-                          bwidth, bheight)
-    start_button.set_background_image('button-background.jpg')
-    start_button.set_text("Start", font, pygame.color.Color(156, 130, 79))
-    start_button.render()
+    newgame_button = Button(button_sprites, (WIDTH - bwidth) // 2,
+                            (HEIGHT - bheight * 5.5) // 2, bwidth, bheight, new_game)
+    newgame_button.set_background_image('button-background.jpg')
+    newgame_button.set_text("Новая игра", font, pygame.color.Color(156, 130, 79))
+    newgame_button.render()
 
-    settings_button = Button(button_sprites, screen, (WIDTH - bwidth) // 2, (HEIGHT - bheight) // 2,
-                             bwidth,
-                             bheight)
+    continue_button = Button(button_sprites, (WIDTH - bwidth) // 2,
+                             (HEIGHT - bheight * 2.5) // 2, bwidth, bheight)
+    continue_button.set_background_image('button-background.jpg')
+    continue_button.set_text("Продолжить", font, pygame.color.Color(156, 130, 79))
+    continue_button.render()
+
+    settings_button = Button(button_sprites, (WIDTH - bwidth) // 2,
+                             (HEIGHT - bheight * -0.5) // 2, bwidth, bheight)
     settings_button.set_background_image('button-background.jpg')
-    settings_button.set_text("Settings", font, pygame.color.Color(156, 130, 79))
+    settings_button.set_text("Настройки", font, pygame.color.Color(156, 130, 79))
     settings_button.render()
 
-    exit_button = Button(button_sprites, screen, (WIDTH - bwidth) // 2, (HEIGHT + bheight * 2) // 2,
-                         bwidth,
-                         bheight, terminate)
+    exit_button = Button(button_sprites, (WIDTH - bwidth) // 2,
+                         (HEIGHT - bheight * -3.5) // 2, bwidth, bheight, terminate)
     exit_button.set_background_image('button-background.jpg')
-    exit_button.set_text("Exit", font, pygame.color.Color(32, 32, 32))
+    exit_button.set_text("Выйти", font, pygame.color.Color(32, 32, 32))
     exit_button.render()
 
     while True:
@@ -1017,20 +1120,80 @@ def start_screen():
             if event.type == pygame.QUIT or (
                     event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                 terminate()
-            if start_button.clicked or (
+            if newgame_button.clicked or continue_button.clicked or (
                     event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN):
                 return
             button_sprites.update(event)
+        screen.blit(fon, (0, 0))
+        button_sprites.draw(screen)
         pygame.display.flip()
         clock.tick(FPS)
 
 
+# Создать новую игру (выбрать карту, количество игроков и т.д.)
+def new_game():
+    fon = pygame.transform.scale(load_image('background.jpg'), (WIDTH, HEIGHT))
+    screen.blit(fon, (0, 0))
+
+    button_sprites.empty()
+
+    x, y = 150, 100
+    bwidth, bheight = 300, 60
+
+    g_input = InputBox(inputbox_sprites, x, y, bwidth, bheight, 'Имя')
+    g_input.set_background_color(pygame.color.Color(27, 18, 12, 200))
+    g_input.render()
+
+    r_input = InputBox(inputbox_sprites, x, y + bheight * 1.5, bwidth, bheight, 'Имя')
+    r_input.set_background_color(pygame.color.Color(27, 18, 12, 200))
+    r_input.set_enabled(False)
+    r_input.render()
+
+    b_input = InputBox(inputbox_sprites, x, y + bheight * 3, bwidth, bheight, 'Имя')
+    b_input.set_background_color(pygame.color.Color(27, 18, 12, 200))
+    b_input.set_enabled(False)
+    b_input.render()
+
+    y_input = InputBox(inputbox_sprites, x, y + bheight * 4.5, bwidth, bheight, 'Имя')
+    y_input.set_background_color(pygame.color.Color(27, 18, 12, 200))
+    y_input.set_enabled(False)
+    y_input.render()
+
+    circles = pygame.Surface((bheight, bheight * 5.5), flags=pygame.SRCALPHA)
+    colors = [(0, 0x80, 0, 200), (255, 0, 0, 200), (0, 0, 255, 200), (255, 255, 0, 200)]#[0x008000, 0xff0000, 0x0000ff, 0xffff00]
+    ys = [0, int(bheight * 1.5), int(bheight * 3), int(bheight * 4.5)]
+    for i in range(4):
+        pygame.draw.circle(circles, colors[i], (bheight // 2, ys[i] + bheight // 2),
+                           bheight // 2)
+    screen.blit(circles, (x - bheight - 10, y))
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                start_screen()
+                return
+            inputbox_sprites.update(event)
+            button_sprites.update(event)
+        screen.blit(fon, (0, 0))
+        screen.blit(circles, (x - bheight - 10, y), special_flags=pygame.BLEND_ADD)
+        r_input.set_enabled(g_input.text)
+        b_input.set_enabled(r_input.text)
+        y_input.set_enabled(b_input.text)
+        inputbox_sprites.draw(screen)
+        button_sprites.draw(screen)
+        pygame.display.flip()
+        clock.tick(FPS)
+    # TODO: выбор карты и ее предпросмотр, создание новой игры
+
+
 start_screen()  # Main menu
 screen.fill(0xff0000)
-field = Field("example.txt", N)  # Игровое поле
+field = Field(MAPS["example"], N)  # Игровое поле
 cam = Camera(field)
 control_panel = ControlPanel(field, cam)
-black_texture = pygame.transform.scale(load_image('black-texture.png'), (WIDTH, HEIGHT))
+black_texture = pygame.transform.scale(load_image("black-texture.png"), (WIDTH, HEIGHT))
 up_counter, down_counter, left_counter, right_counter = [None] * 4
 ctrl_pressed = False
 hold_timeout = 5  # задержка после зажатия кнопки
