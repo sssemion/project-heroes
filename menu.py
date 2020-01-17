@@ -179,6 +179,7 @@ ITEMS = {
 # Библиотека карт
 MAPS = {
     'example': Map('example.txt', "Пример", "Просто карта для тестирования"),
+    'example2': Map('example.txt', "Еще один пример", "Еще одна пустая картаааааааааааааааааааа")
 }
 
 
@@ -1082,6 +1083,82 @@ class InputBox(pygame.sprite.Sprite):
         # self.surface.blit(self.image, (self.x, self.y))
 
 
+class CheckBoxGroup(pygame.sprite.Group):
+    def __init__(self, *sprites):
+        super().__init__(sprites)
+        self.checked = None
+
+    def get_checked(self):
+        for sprite in self.sprites():
+            if sprite.is_checked():
+                return sprite
+        return None
+
+    def uncheck_all(self):
+        for sprite in self.sprites():
+            sprite.set_checked(False)
+
+    def get_by_name(self, name):
+        for sprite in self.sprites():
+            if sprite.name == name:
+                return sprite
+        return None
+
+
+class CheckBox(Button):
+    def __init__(self, group: CheckBoxGroup, name, x, y, width, height, checked=False):
+        super().__init__(group, x, y, width, height)  # POSSIBLE CRASH
+        self.group = group
+        self.name = name
+        self.checked = checked
+
+    def set_checked(self, checked):
+        self.checked = checked
+
+    def is_checked(self):
+        return self.checked
+
+    def on_click(self, event):
+        if self.x < event.pos[0] < self.x + self.width \
+                and self.y < event.pos[1] < self.y + self.height:
+            self.group.uncheck_all()
+            self.set_checked(True)
+
+    def update(self, *args):
+        for arg in args:
+            if arg.type == pygame.MOUSEBUTTONDOWN:
+                self.on_click(arg)
+            elif arg.type == pygame.MOUSEMOTION:
+                self.on_hover(arg)
+        self.render()
+
+    def render(self):
+        self.image = pygame.Surface([self.width, self.height], flags=pygame.SRCALPHA)
+        if self.bgimage is not None:
+            self.image.blit(self.bgimage, (0, 0))
+        else:
+            self.image.fill(self.bgcolor)
+            pygame.draw.rect(self.image, pygame.color.Color(0xe7, 0xda, 0xae, 255),
+                             (0, 0, self.image.get_width(),
+                              self.image.get_height()), 1)
+        if self.hovered:
+            black = pygame.Surface((self.width, self.height))
+            black.fill(pygame.Color(0, 0, 0))
+            black.set_alpha(32)
+            self.image.blit(black, (0, 0))
+
+        try:
+            rendered = self.font.render(self.text, True, self.textcolor)
+            w, h = rendered.get_size()
+            self.image.blit(rendered, ((self.width - w) // 2, (self.height - h) // 2))
+        except AttributeError:
+            print('error')
+
+        if self.checked:
+            pygame.draw.rect(self.image, pygame.color.Color(0xe7, 0xda, 0xae, 255),
+                             (1, 1, self.image.get_width() - 2, self.image.get_height() - 2), 3)
+
+
 # Стартовый экран
 def start_screen():
     fon = pygame.transform.scale(load_image('background.jpg'), (WIDTH, HEIGHT))
@@ -1135,37 +1212,54 @@ def new_game():
     fon = pygame.transform.scale(load_image('background.jpg'), (WIDTH, HEIGHT))
     screen.blit(fon, (0, 0))
 
+    font = pygame.font.Font('data/16478.otf', 24)
+
     button_sprites.empty()
 
-    x, y = 150, 100
-    bwidth, bheight = 300, 60
+    inp_x, y = WIDTH // 12.8, HEIGHT // 10.8
+    bwidth, bheight = WIDTH // 6.4, HEIGHT // 18
 
-    g_input = InputBox(inputbox_sprites, x, y, bwidth, bheight, 'Имя')
+    # Поля для ввода имен игроков
+    g_input = InputBox(inputbox_sprites, inp_x, y, bwidth, bheight, 'Имя')
     g_input.set_background_color(pygame.color.Color(27, 18, 12, 200))
     g_input.render()
 
-    r_input = InputBox(inputbox_sprites, x, y + bheight * 1.5, bwidth, bheight, 'Имя')
+    r_input = InputBox(inputbox_sprites, inp_x, y + bheight * 1.5, bwidth, bheight, 'Имя')
     r_input.set_background_color(pygame.color.Color(27, 18, 12, 200))
     r_input.set_enabled(False)
     r_input.render()
 
-    b_input = InputBox(inputbox_sprites, x, y + bheight * 3, bwidth, bheight, 'Имя')
+    b_input = InputBox(inputbox_sprites, inp_x, y + bheight * 3, bwidth, bheight, 'Имя')
     b_input.set_background_color(pygame.color.Color(27, 18, 12, 200))
     b_input.set_enabled(False)
     b_input.render()
 
-    y_input = InputBox(inputbox_sprites, x, y + bheight * 4.5, bwidth, bheight, 'Имя')
+    y_input = InputBox(inputbox_sprites, inp_x, y + bheight * 4.5, bwidth, bheight, 'Имя')
     y_input.set_background_color(pygame.color.Color(27, 18, 12, 200))
     y_input.set_enabled(False)
     y_input.render()
 
+    # Цветные кружки возле полей для ввода для обозначения цвета команд
     circles = pygame.Surface((bheight, bheight * 5.5), flags=pygame.SRCALPHA)
-    colors = [(0, 0x80, 0, 200), (255, 0, 0, 200), (0, 0, 255, 200), (255, 255, 0, 200)]#[0x008000, 0xff0000, 0x0000ff, 0xffff00]
+    colors = [(0, 0x80, 0, 200), (255, 0, 0, 200), (0, 0, 255, 200), (255, 255, 0, 200)]
     ys = [0, int(bheight * 1.5), int(bheight * 3), int(bheight * 4.5)]
     for i in range(4):
         pygame.draw.circle(circles, colors[i], (bheight // 2, ys[i] + bheight // 2),
                            bheight // 2)
-    screen.blit(circles, (x - bheight - 10, y))
+    screen.blit(circles, (inp_x - bheight - 10, y))
+
+    # Выбор карты
+    map_x = WIDTH - inp_x - bwidth
+    checkbox_sprites = CheckBoxGroup()
+    for i, (name, map_obj) in enumerate(MAPS.items()):
+        checkbox = CheckBox(checkbox_sprites, name, map_x, y + bheight * i * 1.5, bwidth, bheight)
+        checkbox.set_text(map_obj.get_name(), font, pygame.color.Color(156, 130, 79))
+        checkbox.set_background_color(pygame.color.Color(138, 15, 18, 200))
+        checkbox.set_checked(i == 0)
+        checkbox.render()
+    description = font.render(MAPS[checkbox_sprites.get_checked().name].get_description(),
+                              True, pygame.color.Color(156, 130, 79))
+
 
     while True:
         for event in pygame.event.get():
@@ -1176,16 +1270,23 @@ def new_game():
                 return
             inputbox_sprites.update(event)
             button_sprites.update(event)
+            checkbox_sprites.update(event)
+            description = font.render(MAPS[checkbox_sprites.get_checked().name].get_description(),
+                                      True, pygame.color.Color(156, 130, 79))
         screen.blit(fon, (0, 0))
-        screen.blit(circles, (x - bheight - 10, y), special_flags=pygame.BLEND_ADD)
+        screen.blit(circles, (inp_x - bheight - 10, y), special_flags=pygame.BLEND_ADD)
+        screen.blit(description, ((WIDTH - description.get_width()) // 2, (y - description.get_height()) // 2))
+
         r_input.set_enabled(g_input.text)
         b_input.set_enabled(r_input.text)
         y_input.set_enabled(b_input.text)
+
+        checkbox_sprites.draw(screen)
         inputbox_sprites.draw(screen)
         button_sprites.draw(screen)
         pygame.display.flip()
         clock.tick(FPS)
-    # TODO: выбор карты и ее предпросмотр, создание новой игры
+    # TODO: предпросмотр карты, создание новой игры
 
 
 start_screen()  # Main menu
