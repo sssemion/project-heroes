@@ -108,11 +108,48 @@ class Item:
         return self.name, self.d_atc, self.d_dfc, self.description, self.feature
 
 
+class Tile(pygame.sprite.Sprite):
+    tile_images = {
+        'bestshield': load_image("items/bestshield-floor.png", -1),
+        'boneboots': load_image("items/boneboots-floor.png", -1),
+        'club': load_image("items/club-floor.png", -1),
+        'costrib': load_image("items/rib-floor.png", -1),
+        'costring': load_image("items/ringcost-floor.png", -1),
+        'crownhelm': load_image("items/crownhelm-floor.png", -1),
+        'darkboots': load_image("items/darkboots-floor.png", -1),
+        'darkhelm': load_image("items/darkhelm-floor.png", -1),
+        'darkshield': load_image("items/darkshield-floor.png", -1),
+        'darksword': load_image("items/darksword-floor.png"),
+        'firechest': load_image("items/firechest-floor.png", -1),
+        'goldchest': load_image("items/goldchest-floor.png", -1),
+        'hornhelm': load_image("items/hormhelm-floor.png", -1),
+        'ironshield': load_image("items/ironshield-floor.png", -1),
+        'mace': load_image("items/mace-floor.png", -1),
+        'poorchest': load_image("items/poorchest-floor.png", -1),
+        'poorshield': load_image("items/poorshield-floor.png", -1),
+        'saintboots': load_image("items/saintboots-floor.png", -1),
+        'skullhelm': load_image("items/skullhelm-floor.png", -1),
+        'speedboots': load_image("items/speedboots-floor.png", -1),
+        'speedglove': load_image("items/glovespeed-floor.png", -1),
+        'titanchest': load_image("items/titanchest-floor.png", -1),
+        'titansword': load_image("items/titansword-floor.png", -1),
+        'grass': load_image("grass.png"),
+        'rock': load_image("rock.png", -1),
+        'coins': load_image("coins.png"),
+    }
+
+    def __init__(self, tile_type, pos_y, pos_x):
+        super().__init__(tile_sprites)
+        self.image = pygame.transform.scale(Tile.tile_images[tile_type], (tile_width, tile_height))
+        self.rect = self.image.get_rect().move(tile_width * pos_x, tile_height * pos_y)
+
+
 class Map:
     def __init__(self, filename, name, description):
         self.filename = "data/maps/" + filename
         self.name = name
         self.description = description
+        self.preview = None
 
     def load(self):
         with open(self.filename, 'r') as mapFile:
@@ -126,6 +163,36 @@ class Map:
 
     def get_description(self):
         return self.description
+
+    def get_preview(self, width, height):
+        if self.preview is None or self.preview.get_size() != (width, height):
+            field = self.load()
+            w, h = len(field[0]), len(field)
+            empty = pygame.Surface((width, height), flags=pygame.SRCALPHA)
+            self.preview = pygame.Surface((w * tile_width, h * tile_height))
+            for x in range(h):
+                for y in range(w):
+                    self.preview.blit(pygame.transform.scale(Tile.tile_images["grass"],
+                                                                 (tile_width, tile_height)),
+                                          (y * tile_width, x * tile_height))
+                    if field[x][y] == '#':
+                        self.preview.blit(pygame.transform.scale(Tile.tile_images["rock"],
+                                                                 (tile_width, tile_height)),
+                                          (y * tile_width, x * tile_height))
+                    elif field[x][y] == '0':
+                        self.preview.blit(pygame.transform.scale(Tile.tile_images["coins"],
+                                                                 (tile_width, tile_height)),
+                                          (y * tile_width, x * tile_height))
+            if w * tile_width / width > h * tile_height / height:
+                self.preview = pygame.transform.scale(self.preview, (width, int(h * tile_height *
+                                                                     (width / (w * tile_width)))))
+                empty.blit(self.preview, (0, (height - self.preview.get_height()) // 2))
+            else:
+                self.preview = pygame.transform.scale(self.preview, (int(w * tile_width * (height / (
+                        h * tile_height))), height))
+                empty.blit(self.preview, ((width - self.preview.get_width()) // 2, 0))
+            self.preview = empty
+        return self.preview
 
 
 # Библитека предметов
@@ -179,7 +246,7 @@ ITEMS = {
 # Библиотека карт
 MAPS = {
     'example': Map('example.txt', "Пример", "Просто карта для тестирования"),
-    'example2': Map('example.txt', "Еще один пример", "Еще одна пустая картаааааааааааааааааааа")
+    'example2': Map('example2.txt', "Еще один пример", "Еще одна пустая картаааааааааааааааааааа")
 }
 
 
@@ -855,42 +922,6 @@ class Player(pygame.sprite.Sprite):
                 range(len([name for name in os.listdir('data/images/heroes/default')]) - 1)])
 
 
-class Tile(pygame.sprite.Sprite):
-    tile_images = {
-        'bestshield': load_image("items/bestshield-floor.png", -1),
-        'boneboots': load_image("items/boneboots-floor.png", -1),
-        'club': load_image("items/club-floor.png", -1),
-        'costrib': load_image("items/rib-floor.png", -1),
-        'costring': load_image("items/ringcost-floor.png", -1),
-        'crownhelm': load_image("items/crownhelm-floor.png", -1),
-        'darkboots': load_image("items/darkboots-floor.png", -1),
-        'darkhelm': load_image("items/darkhelm-floor.png", -1),
-        'darkshield': load_image("items/darkshield-floor.png", -1),
-        'darksword': load_image("items/darksword-floor.png"),
-        'firechest': load_image("items/firechest-floor.png", -1),
-        'goldchest': load_image("items/goldchest-floor.png", -1),
-        'hornhelm': load_image("items/hormhelm-floor.png", -1),
-        'ironshield': load_image("items/ironshield-floor.png", -1),
-        'mace': load_image("items/mace-floor.png", -1),
-        'poorchest': load_image("items/poorchest-floor.png", -1),
-        'poorshield': load_image("items/poorshield-floor.png", -1),
-        'saintboots': load_image("items/saintboots-floor.png", -1),
-        'skullhelm': load_image("items/skullhelm-floor.png", -1),
-        'speedboots': load_image("items/speedboots-floor.png", -1),
-        'speedglove': load_image("items/glovespeed-floor.png", -1),
-        'titanchest': load_image("items/titanchest-floor.png", -1),
-        'titansword': load_image("items/titansword-floor.png", -1),
-        'grass': load_image("grass.png"),
-        'rock': load_image("rock.png", -1),
-        'coins': load_image("coins.png"),
-    }
-
-    def __init__(self, tile_type, pos_y, pos_x):
-        super().__init__(tile_sprites)
-        self.image = pygame.transform.scale(Tile.tile_images[tile_type], (tile_width, tile_height))
-        self.rect = self.image.get_rect().move(tile_width * pos_x, tile_height * pos_y)
-
-
 class Arrow(pygame.sprite.Sprite):
     top_to_right = load_image("from-top-to-right-arrow.png")
     left_to_right = load_image("from-left-to-right-arrow.png")
@@ -1161,7 +1192,6 @@ class CheckBox(Button):
 
 # Стартовый экран
 def start_screen():
-    fon = pygame.transform.scale(load_image('background.jpg'), (WIDTH, HEIGHT))
     screen.blit(fon, (0, 0))
 
     bwidth, bheight = 480, 100
@@ -1209,7 +1239,6 @@ def start_screen():
 
 # Создать новую игру (выбрать карту, количество игроков и т.д.)
 def new_game():
-    fon = pygame.transform.scale(load_image('background.jpg'), (WIDTH, HEIGHT))
     screen.blit(fon, (0, 0))
 
     font = pygame.font.Font('data/16478.otf', 24)
@@ -1259,7 +1288,9 @@ def new_game():
         checkbox.render()
     description = font.render(MAPS[checkbox_sprites.get_checked().name].get_description(),
                               True, pygame.color.Color(156, 130, 79))
-
+    preview_size = int(WIDTH - bwidth * 3.5), int(HEIGHT * 0.85)
+    preview_x, preview_y = (WIDTH - preview_size[0]) // 2, y
+    preview = MAPS[checkbox_sprites.get_checked().name].get_preview(*preview_size)
 
     while True:
         for event in pygame.event.get():
@@ -1273,9 +1304,12 @@ def new_game():
             checkbox_sprites.update(event)
             description = font.render(MAPS[checkbox_sprites.get_checked().name].get_description(),
                                       True, pygame.color.Color(156, 130, 79))
+            preview = MAPS[checkbox_sprites.get_checked().name].get_preview(*preview_size)
         screen.blit(fon, (0, 0))
         screen.blit(circles, (inp_x - bheight - 10, y), special_flags=pygame.BLEND_ADD)
-        screen.blit(description, ((WIDTH - description.get_width()) // 2, (y - description.get_height()) // 2))
+        screen.blit(description,
+                    ((WIDTH - description.get_width()) // 2, (y - description.get_height()) // 2))
+        screen.blit(preview, (preview_x, preview_y))
 
         r_input.set_enabled(g_input.text)
         b_input.set_enabled(r_input.text)
@@ -1286,9 +1320,10 @@ def new_game():
         button_sprites.draw(screen)
         pygame.display.flip()
         clock.tick(FPS)
-    # TODO: предпросмотр карты, создание новой игры
+    # TODO: создание новой игры
 
 
+fon = pygame.transform.scale(load_image('background.jpg'), (WIDTH, HEIGHT))
 start_screen()  # Main menu
 screen.fill(0xff0000)
 field = Field(MAPS["example"], N)  # Игровое поле
