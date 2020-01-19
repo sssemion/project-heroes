@@ -214,6 +214,7 @@ class Tile(pygame.sprite.Sprite):
         'grass': load_image("grass.png"),
         'rock': load_image("rock.png", -1),
         'coins': load_image("coins.png"),
+        'null': pygame.Surface((0, 0)),
     }
 
     def __init__(self, tile_type, pos_y, pos_x):
@@ -320,7 +321,8 @@ ITEMS = {
                 {'sale': 1}),
     'costring': Item('Лента дипломата', 0, 0, "Кольцо дипломата. Все идут за вами", 'other',
                      'costring', {'sale': 1}),
-    'null': Item('', 0, 0, '', "all"),
+    'null': Item('', 0, 0, '', "all", "null"),
+    'coins': Item('coins', 0, 0, '', 0),
 }
 
 # Библиотека карт
@@ -471,6 +473,8 @@ class Field:  # Игровое поле
         self.game_name, self.map_name, self.names, *self.field = file.read().split('\n')
         file.close()
 
+        self.field = [list(map(str.strip, line.split(';'))) for line in self.field]
+
         self.width = len(self.field[0])
         self.height = len(self.field)
         self.players = {}
@@ -531,23 +535,19 @@ class Field:  # Игровое поле
         # Отделяем карту от доп. данных
         data = {}
         new_field = []
+        # self.field = list(map(lambda x: ''.join(x), self.field))
         for row in range(len(self.field)):
             b_flag = 0
             lendata = 0
             new_field.append([])
             for col in range(len(self.field[row])):
-                if self.field[row][col] == '{':
-                    b_flag = 1
-                    key = row, col - lendata
-                    info = ''
-                elif self.field[row][col] == '}':
-                    b_flag = 0
-                    lendata += col - key[1] + 1
+                s = self.field[row][col]
+                if s[-1] == '}':
+                    key = row, col
+                    info = s[s.find('{'):-1]
                     data[key] = info
-                elif not b_flag:
-                    new_field[row].append(self.field[row][col])
-                elif b_flag:
-                    info += self.field[row][col]
+                    self.field[row][col] = s[:s.find('{')]
+                new_field[row].append(self.field[row][col])
         self.field = new_field
 
         self.width = len(self.field[0])
@@ -567,7 +567,7 @@ class Field:  # Игровое поле
                 elif self.field[x][y] == 'G':
                     self.players[GREEN] = [Player(x, y, GREEN)]
                     if (x, y) in data:
-                        atc, dfc, inventory, equipped, bonus, army, movepoints = data[(x, y)].split(';')
+                        atc, dfc, inventory, equipped, bonus, army, movepoints = data[(x, y)].split('&')
                         bonus = list(map(int, bonus.split(',')))
                         self.players[GREEN][0].atc = atc
                         self.players[GREEN][0].dfc = dfc
@@ -582,11 +582,11 @@ class Field:  # Игровое поле
                     if self.number_of_players >= 2:
                         self.players[RED] = [Player(x, y, RED)]
                         if (x, y) in data:
-                            atc, dfc, inventory, equipped, bonus, army, movepoints = data[(x, y)].split(';')
+                            atc, dfc, inventory, equipped, bonus, army, movepoints = data[(x, y)].split('&')
                             bonus = list(map(int, bonus.split(',')))
                             self.players[RED][0].atc = atc
                             self.players[RED][0].dfc = dfc
-                            self.players[RED][0].inventory = [(ITEMS[item] if item else 'null') for item in inventory.split(',')]
+                            self.players[RED][0].inventory = [(ITEMS[item] if item else ITEMS['null']) for item in inventory.split(',')]
                             self.players[RED][0].equipped_items = [(ITEMS[item] if item else ITEMS['null']) for item in equipped.split(',')]
                             self.players[RED][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1], 'bonus_move': bonus[2], 'd_spd': bonus[3]}
                             # self.players[RED][0].army = [(UNITS[unit] if unit else 'null') for unit in army.split(',')]
@@ -599,7 +599,7 @@ class Field:  # Игровое поле
                     if self.number_of_players >= 3:
                         self.players[BLUE] = [Player(x, y, BLUE)]
                         if (x, y) in data:
-                            atc, dfc, inventory, equipped, bonus, army, movepoints = data[(x, y)].split(';')
+                            atc, dfc, inventory, equipped, bonus, army, movepoints = data[(x, y)].split('&')
                             bonus = list(map(int, bonus.split(',')))
                             self.players[BLUE][0].atc = atc
                             self.players[BLUE][0].dfc = dfc
@@ -616,7 +616,7 @@ class Field:  # Игровое поле
                     if self.number_of_players >= 4:
                         self.players[YELLOW] = [Player(x, y, YELLOW)]
                         if (x, y) in data:
-                            atc, dfc, inventory, equipped, bonus, army, movepoints = data[(x, y)].split(';')
+                            atc, dfc, inventory, equipped, bonus, army, movepoints = data[(x, y)].split('&')
                             bonus = list(map(int, bonus.split(',')))
                             self.players[YELLOW][0].atc = atc
                             self.players[YELLOW][0].dfc = dfc
@@ -625,11 +625,11 @@ class Field:  # Игровое поле
                             self.players[YELLOW][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1], 'bonus_move': bonus[2], 'd_spd': bonus[3]}
                             # self.players[YELLOW][0].army = [(UNITS[unit] if unit else 'null') for unit in army.split(',')]
                             self.players[YELLOW][0].movepoints = movepoints
-                            self.field[x][y] = Cell(content=self.players[YELLOW][0])
+                        self.field[x][y] = Cell(content=self.players[YELLOW][0])
                     else:
                         self.field[x][y] = Cell()
                 elif self.field[x][y] == '0':
-                    self.field[x][y] = Cell(content=Item('money', 0, 0, '', 0))
+                    self.field[x][y] = Cell(content=Item('coins', 0, 0, '', 0))
                 elif self.field[x][y] in HOUSES:
                     self.field[x][y] = Cell(building=House(x, y, self.field[x][y] + '.png'))
                 self.field[x][y].render(x, y)
@@ -810,11 +810,14 @@ class Field:  # Игровое поле
                         # army = ','.join(map(lambda x: x.tile_type, content.army))
                         army = ''
                         mp = content.movepoints
-                        new_field[x] += f'{{{atc};{dfc};{inventory};{equipped};{bonus};{army};{mp}}}'
+                        new_field[x] += f'{{{atc}&{dfc}&{inventory}&{equipped}&{bonus}&{army}&{mp}}}'
                     elif type(content).__name__ == 'Item':
                         new_field[x] += '0'  # TODO: сохранение Item-ов
                     elif type(content).__name__ == 'NPC':
                         pass
+                new_field[x] += ';'
+            new_field[x] = new_field[x][:-1]
+
 
         file = open(os.path.join("data/saves", f"{self.save_slot}.txt"), 'w', encoding='utf-8')
         file.write(self.game_name + '\n')
@@ -922,7 +925,7 @@ class HeroFightScreen:
 
 def fight(left_hero, right_hero):
     coor_row = [0, 1, 3, 4, 5, 7, 8]
-    null_unit = Unit("player.png", "", 0, 0, 0, 0, 0, 0, 0, "", False)
+    null_unit = Unit("player.png", "", 0, 0, 0, 0, 0, 0, 0)
     board = [[0] * 10 for _ in range(9)]
     turn_queue = left_hero.army + right_hero.army
 
@@ -982,8 +985,8 @@ def fight(left_hero, right_hero):
 
 class Player(pygame.sprite.Sprite):
     default_image = pygame.transform.scale(load_image('player.png', -1), (tile_width, tile_height))
-    null_item = Item("", 0, 0, "", "all")
-    null_unit = Unit("player.png", "", 0, 0, 0, 0, 0, 0, 0, "", False)
+    null_item = Item("", 0, 0, "", "all", 'null')
+    null_unit = Unit("player.png", "", 0, 0, 0, 0, 0, 0, 0)
     moving_animation = itertools.cycle(
         [pygame.transform.scale(load_image(f'heroes/default/{i}.png'), (tile_width, tile_height)) for
          i in range(len([name for name in os.listdir('data/images/heroes/default')]) - 1)])
@@ -1038,6 +1041,8 @@ class Player(pygame.sprite.Sprite):
                 row, col = self.get_pos()[::-1]
                 field.field[row][col].content = None
                 field.field[row][col].render(row, col)
+        elif type(other).__name__ == 'House':
+            other.visit(self)
 
     def get_characteristics(self):
         return self.atc, self.dfc
@@ -1103,42 +1108,6 @@ class House(pygame.sprite.Sprite):
             screen.blit(surface, topleft_coord)
             pygame.display.flip()
             clock.tick(FPS)
-
-
-class Tile(pygame.sprite.Sprite):
-    tile_images = {
-        'bestshield': load_image("items/bestshield-floor.png", -1),
-        'boneboots': load_image("items/boneboots-floor.png", -1),
-        'club': load_image("items/club-floor.png", -1),
-        'costrib': load_image("items/rib-floor.png", -1),
-        'costring': load_image("items/ringcost-floor.png", -1),
-        'crownhelm': load_image("items/crownhelm-floor.png", -1),
-        'darkboots': load_image("items/darkboots-floor.png", -1),
-        'darkhelm': load_image("items/darkhelm-floor.png", -1),
-        'darkshield': load_image("items/darkshield-floor.png", -1),
-        'darksword': load_image("items/darksword-floor.png"),
-        'firechest': load_image("items/firechest-floor.png", -1),
-        'goldchest': load_image("items/goldchest-floor.png", -1),
-        'hornhelm': load_image("items/hormhelm-floor.png", -1),
-        'ironshield': load_image("items/ironshield-floor.png", -1),
-        'mace': load_image("items/mace-floor.png", -1),
-        'poorchest': load_image("items/poorchest-floor.png", -1),
-        'poorshield': load_image("items/poorshield-floor.png", -1),
-        'saintboots': load_image("items/saintboots-floor.png", -1),
-        'skullhelm': load_image("items/skullhelm-floor.png", -1),
-        'speedboots': load_image("items/speedboots-floor.png", -1),
-        'speedglove': load_image("items/glovespeed-floor.png", -1),
-        'titanchest': load_image("items/titanchest-floor.png", -1),
-        'titansword': load_image("items/titansword-floor.png", -1),
-        'grass': load_image("grass.png"),
-        'rock': load_image("rock.png", -1),
-        'coins': load_image("coins.png"),
-    }
-
-    def __init__(self, tile_type, pos_y, pos_x):
-        super().__init__(tile_sprites)
-        self.image = pygame.transform.scale(Tile.tile_images[tile_type], (tile_width, tile_height))
-        self.rect = self.image.get_rect().move(tile_width * pos_x, tile_height * pos_y)
 
 
 class Arrow(pygame.sprite.Sprite):
@@ -1745,7 +1714,7 @@ def new_game():
                     field = MAPS[map_name].load()
                     height = len(field)
                     for row in range(height):
-                        file.write(''.join(field[row]) + '\n' * (row != height - 1))
+                        file.write(';'.join(field[row]) + '\n' * (row != height - 1))
                     file.close()
                     return Field(save_slot)
 
