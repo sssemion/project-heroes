@@ -12,6 +12,8 @@ sel_her_row, sel_her_col = None, None
 last_row, last_col = -1, -1
 N = 2  # tmp
 
+
+
 pygame.init()
 screen_info = pygame.display.Info()
 WIDTH, HEIGHT = screen_info.current_w, screen_info.current_h
@@ -81,7 +83,9 @@ tile_sprites = pygame.sprite.Group()
 player_sprites = pygame.sprite.Group()
 unit_sprites = pygame.sprite.Group()
 arrow_sprites = pygame.sprite.Group()
+house_sprites = pygame.sprite.Group()
 
+fon = pygame.transform.scale(load_image('background.jpg'), (WIDTH, HEIGHT))
 
 class Item:
     def __init__(self, name, d_atc, d_dfc, description, slot, tile_type='coins', feature=None):
@@ -251,6 +255,21 @@ UNITS = {
     'pikeman': Unit("units/pikeman.png", "Копейщик", 2, 4, 10, 15, 1, 8, 40),
 }
 
+HOUSES = {
+    'hair': None,
+    'hangel': None,
+    'hcyclope': None,
+    'hearth': None,
+    'hfire': None,
+    'hgnom': None,
+    'hgoblin': None,
+    'hhorn': None,
+    'hogre': None,
+    'hpegas': None,
+    'hpikeman': None,
+    'hswordsman': None,
+}
+
 
 class Block:  # Предмет, блокирующий проход
     def __init__(self, tile_type='rock'):
@@ -261,10 +280,11 @@ class Block:  # Предмет, блокирующий проход
 
 
 class Cell:  # Ячейка поля Field
-    def __init__(self, cost=100, tile_type='grass', content=None):
+    def __init__(self, cost=100, tile_type='grass', content=None, building=None):
         self.cost = cost  # cost - стоимость передвижения по клетке
         self.tile_type = tile_type
         self.content = content  # content - содержимое ячейки (None, экземпляр класса Block или любой другой объект)
+        self.building = building
 
     def get_cost(self):
         return self.cost
@@ -275,6 +295,9 @@ class Cell:  # Ячейка поля Field
     def get_content(self):
         return self.content
 
+    def get_building(self):
+        return self.building
+
     def render(self, x, y):
         Tile(self.tile_type, x, y)
         try:
@@ -283,7 +306,9 @@ class Cell:  # Ячейка поля Field
             pass
 
     def get_minimap_color(self):
-        if self.content is None:
+        if self.building is not None:
+            return 0x331a00
+        elif self.content is None:
             return 0x008000
         elif type(self.content).__name__ == "Item":
             return 0xffd700
@@ -291,6 +316,8 @@ class Cell:  # Ячейка поля Field
             return 0xff0000
         elif type(self.content).__name__ == "Block":
             return 0x454545
+        else:
+            return 0
 
 
 class ControlPanel:  # Панель управления в правой части экрана
@@ -348,10 +375,10 @@ class Field:  # Игровое поле
         self.Dg = networkx.DiGraph()
         filename = "data/maps/" + filename
         with open(filename, 'r') as mapFile:
-            level_map = [line.strip() for line in mapFile]
+            level_map = [list(map(str.strip, line.split(';'))) for line in mapFile]
         max_width = max(map(len, level_map))
         # дополняем каждую строку пустыми клетками ('.')
-        self.field = list(map(lambda x: list(x.ljust(max_width, '.')), level_map))
+        self.field = list(map(lambda x: x + ['.'] * (max_width - len(x)), level_map))
         self.width = len(self.field[0])
         self.height = len(self.field)
         self.players = {}
@@ -438,6 +465,8 @@ class Field:  # Игровое поле
                         self.field[x][y] = Cell()
                 elif self.field[x][y] == '0':
                     self.field[x][y] = Cell(content=Item('money', 0, 0, '', 0))
+                elif self.field[x][y] in HOUSES:
+                    self.field[x][y] = Cell(building=House(x, y, self.field[x][y] + '.png'))
                 self.field[x][y].render(x, y)
 
     def get_click(self, event):
@@ -491,6 +520,7 @@ class Field:  # Игровое поле
                         selected_hero.update('moving', dcol, drow)
 
                         tile_sprites.draw(self.space)
+                        house_sprites.draw(self.space)
                         player_sprites.draw(self.space)
                         screen.blit(self.space, (Field.margin_right - cam.get_x_shift(),
                                                  Field.margin_top - cam.get_y_shift()))
@@ -501,9 +531,11 @@ class Field:  # Игровое поле
 
                     # Взаимодейтсвие с предметами
                     content = self.field[row][col].get_content()
+                    building = self.field[row][col].get_building()
                     if content is not None:
                         selected_hero.interact(content)
-
+                    if building is not None:
+                        selected_hero.interact(building)
                     self.field[row][col].content = selected_hero
                     self.field[sel_her_row][sel_her_col].content = None
                     sel_her_col, sel_her_row = selected_hero.get_pos()
@@ -806,13 +838,14 @@ class Player(pygame.sprite.Sprite):
                 row, col = self.get_pos()[::-1]
                 field.field[row][col].content = None
                 field.field[row][col].render(row, col)
-
         elif type(other).__name__ == 'build':
             if other.variety != 'town':  # Опять заглушка
                 d_atc, d_dfc, d_features = other.visit
                 self.atc, self.dfc = self.atc + d_atc, self.dfc + d_dfc
                 for key, val in d_features.items():
                     self.bonus[key] += val
+        elif type(other).__name__ == 'House':
+            other.visit(self)
 
     def get_characteristics(self):
         return self.atc, self.dfc
@@ -844,6 +877,40 @@ class Player(pygame.sprite.Sprite):
                                        (tile_width, tile_height)),
                 reversed, False) for i in
                 range(len([name for name in os.listdir('data/images/heroes/default')]) - 1)])
+
+
+class House(pygame.sprite.Sprite):
+    def __init__(self, row, col, image_name):
+        super().__init__(house_sprites)
+        self.image = pygame.transform.scale(load_image("homes/" + image_name),
+                                            (tile_width, tile_height))
+        self.rect = self.image.get_rect().move(col * tile_width, row * tile_height)
+
+    def visit(self, visitor: Player):
+        # Сохраняем основной экран и затемняем его
+        screen_save = screen.copy()
+        black = pygame.Surface((WIDTH, HEIGHT))
+        black.fill(pygame.color.Color(0, 0, 0))
+        black.set_alpha(200)
+        screen.blit(black, (0, 0))
+
+        # Создаем экран взаимодействия
+        width, height = int(WIDTH / 2.5), int(HEIGHT / 1.8)
+        topleft_coord = ((WIDTH - width) // 2, (HEIGHT - height) // 2)
+        surface = pygame.Surface((width, height))
+        surface.blit(fon, (-100, -100))
+
+        while True:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    terminate()
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        screen.blit(screen_save, (0, 0))
+                        return
+            screen.blit(surface, topleft_coord)
+            pygame.display.flip()
+            clock.tick(FPS)
 
 
 class Tile(pygame.sprite.Sprite):
@@ -1000,7 +1067,6 @@ class Button(pygame.sprite.Sprite):
 
 
 def start_screen():
-    fon = pygame.transform.scale(load_image('background.jpg'), (WIDTH, HEIGHT))
     screen.blit(fon, (0, 0))
 
     bwidth, bheight = 400, 80
@@ -1117,6 +1183,7 @@ while running:
 
     # all_sprites.draw(screen)
     tile_sprites.draw(field.space)
+    house_sprites.draw(field.space)
     arrow_sprites.draw(field.space)
     player_sprites.draw(field.space)
     screen.blit(field.space, (Field.margin_right - cam.get_x_shift(),
