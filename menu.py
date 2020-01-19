@@ -12,8 +12,6 @@ sel_her_row, sel_her_col = None, None
 last_row, last_col = -1, -1
 N = 2  # tmp
 
-
-
 pygame.init()
 screen_info = pygame.display.Info()
 WIDTH, HEIGHT = screen_info.current_w, screen_info.current_h
@@ -87,6 +85,7 @@ house_sprites = pygame.sprite.Group()
 
 fon = pygame.transform.scale(load_image('background.jpg'), (WIDTH, HEIGHT))
 
+
 class Item:
     def __init__(self, name, d_atc, d_dfc, description, slot, tile_type='coins', feature=None):
         self.name, self.d_atc, self.d_dfc, self.description, self.feature = name, d_atc, d_dfc, description, feature
@@ -120,8 +119,8 @@ class Unit(pygame.sprite.Sprite):
         self.top_hp = hp
         self.count, self.name, self.atc, self.dfc, self.min_dmg, self.max_dmg, self.spd, self.hp = \
             count, name, attack, defence, min_dmg, max_dmg, speed, hp
-        self.cur_atc, self.cur_dfc, self.cur_min_dmg, self.cur_max_dmg, self.cur_spd, self.cur_hp, self.cur_top_hp = \
-            attack, defence, min_dmg, max_dmg, speed, hp, hp
+        self.cur_atc, self.cur_dfc, self.cur_spd, self.cur_hp, self.cur_top_hp = \
+            attack, defence, speed, hp, hp
 
     def attack_rat(self, enemy):
         damage = random.randint(self.min_dmg, self.max_dmg) * (self.cur_atc / enemy.cur_dfc) * (
@@ -187,6 +186,9 @@ class Unit(pygame.sprite.Sprite):
         if self.spd >= other.spd:
             return True
         return False
+
+    def __add__(self, other):
+        self.count += other.count
 
 
 # Библитека предметов
@@ -256,18 +258,18 @@ UNITS = {
 }
 
 HOUSES = {
-    'hair': None,
-    'hangel': None,
-    'hcyclope': None,
-    'hearth': None,
-    'hfire': None,
-    'hgnom': None,
-    'hgoblin': None,
-    'hhorn': None,
-    'hogre': None,
-    'hpegas': None,
-    'hpikeman': None,
-    'hswordsman': None,
+    'hair': (UNITS['air'], 1, 8),
+    'hangel': (UNITS['angel'], 5, 1),
+    'hcyclope': (UNITS['cyclope'], 5, 1),
+    'hearth': (UNITS['earth'], 3, 4),
+    'hfire': (UNITS['fire'], 5, 8),
+    'hgnom': (UNITS['gnom'], 1, 8),
+    'hgoblin': (UNITS['goblin'], 1, 8),
+    'hhorn': (UNITS['horn'], 5, 1),
+    'hogre': (UNITS['ogre'], 3, 4),
+    'hpegas': (UNITS['pegas'], 3, 4),
+    'hpikeman': (UNITS['pikeman'], 1, 6),
+    'hswordsman': (UNITS['swordsman'], 3, 4),
 }
 
 
@@ -464,9 +466,9 @@ class Field:  # Игровое поле
                     else:
                         self.field[x][y] = Cell()
                 elif self.field[x][y] == '0':
-                    self.field[x][y] = Cell(content=Item('money', 0, 0, '', 0))
+                    self.field[x][y] = Cell(content=ITEMS['club'])
                 elif self.field[x][y] in HOUSES:
-                    self.field[x][y] = Cell(building=House(x, y, self.field[x][y] + '.png'))
+                    self.field[x][y] = Cell(building=House(x, y, self.field[x][y] + '.png', *HOUSES[self.field[x][y]]))
                 self.field[x][y].render(x, y)
 
     def get_click(self, event):
@@ -880,7 +882,8 @@ class Player(pygame.sprite.Sprite):
 
 
 class House(pygame.sprite.Sprite):
-    def __init__(self, row, col, image_name):
+    def __init__(self, row, col, image_name, unit, cost, delta):
+        self.unit, self.cost, self.delta = unit, cost, delta
         super().__init__(house_sprites)
         self.image = pygame.transform.scale(load_image("homes/" + image_name),
                                             (tile_width, tile_height))
@@ -895,10 +898,16 @@ class House(pygame.sprite.Sprite):
         screen.blit(black, (0, 0))
 
         # Создаем экран взаимодействия
-        width, height = int(WIDTH / 2.5), int(HEIGHT / 1.8)
+        width, height = int(WIDTH / 2.5), int(HEIGHT / 3)
         topleft_coord = ((WIDTH - width) // 2, (HEIGHT - height) // 2)
         surface = pygame.Surface((width, height))
         surface.blit(fon, (-100, -100))
+        font_name = pygame.font.Font('data/HoMMFontCyr.ttf', 26)
+        font_aff = pygame.font.Font('data/HoMMFontCyr.ttf', 20)
+        name = font_name.render(f"Жилище {self.unit.name}", 10, (156, 130, 79))
+        afford = font_aff.render(f"Желаете купить {self.delta} {self.unit.name} за {self.cost} золота?", 10,
+                                 (156, 130, 79))
+        button_agree = Button()
 
         while True:
             for event in pygame.event.get():
@@ -908,6 +917,8 @@ class House(pygame.sprite.Sprite):
                     if event.key == pygame.K_ESCAPE:
                         screen.blit(screen_save, (0, 0))
                         return
+            surface.blit(name, (10, 10))
+            surface.blit(afford, (10, 60))
             screen.blit(surface, topleft_coord)
             pygame.display.flip()
             clock.tick(FPS)
