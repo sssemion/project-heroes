@@ -108,15 +108,12 @@ class Item:
 
 
 class Unit(pygame.sprite.Sprite):
-    def __init__(self, image, name, attack, defence, min_dmg, max_dmg, count, speed, hp, team,
-                 shoot):
+    def __init__(self, image, name, attack, defence, min_dmg, max_dmg, count, speed, hp):
         super().__init__(unit_sprites)
         self.image = load_image(image)
         self.dead = 0
         self.counter = True
         self.top_hp = hp
-        self.team = team
-        self.shoot = shoot
         self.count, self.name, self.atc, self.dfc, self.min_dmg, self.max_dmg, self.spd, self.hp = \
             count, name, attack, defence, min_dmg, max_dmg, speed, hp
         self.cur_atc, self.cur_dfc, self.cur_min_dmg, self.cur_max_dmg, self.cur_spd, self.cur_hp, self.cur_top_hp = \
@@ -238,20 +235,20 @@ ITEMS = {
 
 # Библиотека юнитов
 UNITS = {
-    'angel': Unit("units/angel", "Ангел", 13, 13, 50, 50, 1, 10, 250),
-    'fire': Unit("units/fire", "Огенный элементаль", 15, 10, 50, 50, 1, 10, 250),
-    'horn': Unit("units/horn", "Единорог", 12, 9, 50, 50, 1, 10, 250),
-    'cyclope': Unit("units/cyclope", "Циклоп", 10, 9, 50, 50, 1, 10, 250),
+    'angel': Unit("units/angel.png", "Ангел", 13, 13, 50, 50, 1, 10, 250),
+    'fire': Unit("units/fire.png", "Огенный элементаль", 15, 10, 50, 50, 1, 10, 250),
+    'horn': Unit("units/horn.png", "Единорог", 12, 9, 50, 50, 1, 10, 250),
+    'cyclope': Unit("units/cyclope.png", "Циклоп", 10, 9, 50, 50, 1, 10, 250),
 
-    'pegas': Unit("units/pegas", "Пегас", 10, 10, 20, 30, 1, 12, 50),
-    'ogre': Unit("units/ogre", "Огр", 8, 10, 25, 40, 1, 6, 120),
-    'swordsman': Unit("units/swordsman", "Крестоносец", 9, 9, 30, 45, 1, 8, 90),
-    'earth': Unit("units/earth", "Земляной элементаль", 7, 7, 15, 50, 1, 5, 80),
+    'pegas': Unit("units/pegas.png", "Пегас", 10, 10, 20, 30, 1, 12, 50),
+    'ogre': Unit("units/ogre.png", "Огр", 8, 10, 25, 40, 1, 6, 120),
+    'swordsman': Unit("units/swordsman.png", "Крестоносец", 9, 9, 30, 45, 1, 8, 90),
+    'earth': Unit("units/earth.png", "Земляной элементаль", 7, 7, 15, 50, 1, 5, 80),
 
-    'air': Unit("units/air", "Воздушный элемнатль", 5, 5, 10, 20, 1, 7, 20),
-    'goblin': Unit("units/goblin", "Гоблин", 7, 1, 15, 30, 1, 9, 15),
-    'gnom': Unit("units/gnom", "Гном", 3, 6, 50, 50, 1, 4, 30),
-    'pikeman': Unit("units/pikeman", "Копейщик", 2, 4, 10, 15, 1, 8, 40),
+    'air': Unit("units/air.png", "Воздушный элемнатль", 5, 5, 10, 20, 1, 7, 20),
+    'goblin': Unit("units/goblin.png", "Гоблин", 7, 1, 15, 30, 1, 9, 15),
+    'gnom': Unit("units/gnom.png", "Гном", 3, 6, 50, 50, 1, 4, 30),
+    'pikeman': Unit("units/pikeman.png", "Копейщик", 2, 4, 10, 15, 1, 8, 40),
 }
 
 
@@ -691,7 +688,7 @@ class HeroFightScreen:
 
 def fight(left_hero, right_hero):
     coor_row = [0, 1, 3, 4, 5, 7, 8]
-    null_unit = Unit("player.png", "", 0, 0, 0, 0, 0, 0, 0, "", False)
+    null_unit = Unit("player.png", "", 0, 0, 0, 0, 0, 0, 0)
     board = [[0] * 10 for _ in range(9)]
     turn_queue = left_hero.army + right_hero.army
 
@@ -752,7 +749,7 @@ def fight(left_hero, right_hero):
 class Player(pygame.sprite.Sprite):
     default_image = pygame.transform.scale(load_image('player.png', -1), (tile_width, tile_height))
     null_item = Item("", 0, 0, "all", "")
-    null_unit = Unit("player.png", "", 0, 0, 0, 0, 0, 0, 0, "", False)
+    null_unit = Unit("player.png", "", 0, 0, 0, 0, 0, 0, 0)
     moving_animation = itertools.cycle(
         [pygame.transform.scale(load_image(f'heroes/default/{i}.png'), (tile_width, tile_height)) for
          i in range(len([name for name in os.listdir('data/images/heroes/default')]) - 1)])
