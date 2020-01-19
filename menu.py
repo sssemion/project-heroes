@@ -236,12 +236,13 @@ ITEMS = {
     'titanchest': Item('Титаноывй нагрудник', 12, 20, "Нагрудник Герерала Титанов", 'chest',
                        'titanchest'),
 
-    'speedglove': Item('Конные перчатки', 0, 0, "Перчатки скорой дикости", 'other', 'glovespeed',
+    'speedglove': Item('Конные перчатки', 0, 0, "Перчатки скорой дикости", 'other', 'speedglove',
                        {'bonus_move': 500}),
     'rib': Item('Лента дипломата', 0, 0, "Лента дипломата. Все идут за вами", 'other', 'rib',
                 {'sale': 1}),
     'costring': Item('Лента дипломата', 0, 0, "Кольцо дипломата. Все идут за вами", 'other',
-                     'ringcost', {'sale': 1}),
+                     'costring', {'sale': 1}),
+    'null': Item('', 0, 0, '', "all"),
 }
 
 # Библиотека карт
@@ -332,7 +333,6 @@ class ControlPanel:  # Панель управления в правой час�
         return surface
 
 
-# TODO: сохранение игры (хотя бы 1, чтобы можно было продолжить после выхода)
 class Field:  # Игровое поле
     size_in_pixels = WIDTH - ControlPanel.width, HEIGHT
     margin_top = int(14 / 732 * size_in_pixels[1])
@@ -344,15 +344,24 @@ class Field:  # Игровое поле
     row_count = (size_in_pixels[1] - margin_top - margin_bottom) // tile_height
     col_count = (size_in_pixels[0] - margin_left - margin_right) // tile_width
 
-    def __init__(self, map_obj, *names):
+    def __init__(self, save_slot):
         self.Dg = networkx.DiGraph()
-        self.map = map_obj
-        self.field = map_obj.load()
+        self.save_slot = save_slot
+
+        file = open(os.path.join("data/saves/", f"{save_slot}.txt"), encoding='utf-8')
+        self.game_name, self.map_name, self.names, *self.field = file.read().split('\n')
+        file.close()
+
         self.width = len(self.field[0])
         self.height = len(self.field)
         self.players = {}
 
-        self.number_of_players = len(names)
+        self.names = self.names.split(';')
+        self.number_of_players = len(self.names)
+        self.teams = {}
+        colors = (GREEN, RED, BLUE, YELLOW)
+        for i in range(self.number_of_players):
+            self.teams[colors[i]] = self.names[i]
 
         self.render()
         self.graph()
@@ -400,10 +409,36 @@ class Field:  # Игровое поле
                                                  str(row + turn[0]) + ',' + str(col + turn[1]))
 
     def render(self):
+        # Отделяем карту от доп. данных
+        data = {}
+        new_field = []
+        for row in range(len(self.field)):
+            b_flag = 0
+            lendata = 0
+            new_field.append([])
+            for col in range(len(self.field[row])):
+                if self.field[row][col] == '{':
+                    b_flag = 1
+                    key = row, col - lendata
+                    info = ''
+                elif self.field[row][col] == '}':
+                    b_flag = 0
+                    lendata += col - key[1] + 1
+                    data[key] = info
+                elif not b_flag:
+                    new_field[row].append(self.field[row][col])
+                elif b_flag:
+                    info += self.field[row][col]
+        self.field = new_field
+
+        self.width = len(self.field[0])
+        self.height = len(self.field)
+
         self.frame = pygame.transform.scale(load_image('frame.png'), Field.size_in_pixels)
         screen.blit(self.frame, (0, 0))
         self.space = pygame.Surface((self.width * tile_width,
                                      self.height * tile_height))
+
 
         for x in range(self.height):
             for y in range(self.width):
@@ -413,23 +448,66 @@ class Field:  # Игровое поле
                     self.field[x][y] = Cell(content=Block())
                 elif self.field[x][y] == 'G':
                     self.players[GREEN] = [Player(x, y, GREEN)]
+                    if (x, y) in data:
+                        atc, dfc, inventory, equipped, bonus, army, movepoints = data[(x, y)].split(';')
+                        bonus = list(map(int, bonus.split(',')))
+                        self.players[GREEN][0].atc = atc
+                        self.players[GREEN][0].dfc = dfc
+                        self.players[GREEN][0].inventory = [(ITEMS[item] if item else ITEMS['null']) for item in inventory.split(',')]
+                        self.players[GREEN][0].equipped_items = [(ITEMS[item] if item else ITEMS['null']) for item in equipped.split(',')]
+                        self.players[GREEN][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1], 'bonus_move': bonus[2], 'd_spd': bonus[3]}
+                        # self.players[GREEN][0].army = [(UNITS[unit] if unit else 'null') for unit in army.split(',')]
+                        self.players[GREEN][0].movepoints = movepoints
                     self.field[x][y] = Cell(content=self.players[GREEN][0])
+                    
                 elif self.field[x][y] == 'R':
                     if self.number_of_players >= 2:
                         self.players[RED] = [Player(x, y, RED)]
+                        if (x, y) in data:
+                            atc, dfc, inventory, equipped, bonus, army, movepoints = data[(x, y)].split(';')
+                            bonus = list(map(int, bonus.split(',')))
+                            self.players[RED][0].atc = atc
+                            self.players[RED][0].dfc = dfc
+                            self.players[RED][0].inventory = [(ITEMS[item] if item else 'null') for item in inventory.split(',')]
+                            self.players[RED][0].equipped_items = [(ITEMS[item] if item else ITEMS['null']) for item in equipped.split(',')]
+                            self.players[RED][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1], 'bonus_move': bonus[2], 'd_spd': bonus[3]}
+                            # self.players[RED][0].army = [(UNITS[unit] if unit else 'null') for unit in army.split(',')]
+                            self.players[RED][0].movepoints = movepoints
                         self.field[x][y] = Cell(content=self.players[RED][0])
                     else:
                         self.field[x][y] = Cell()
+
                 elif self.field[x][y] == 'B':
                     if self.number_of_players >= 3:
                         self.players[BLUE] = [Player(x, y, BLUE)]
+                        if (x, y) in data:
+                            atc, dfc, inventory, equipped, bonus, army, movepoints = data[(x, y)].split(';')
+                            bonus = list(map(int, bonus.split(',')))
+                            self.players[BLUE][0].atc = atc
+                            self.players[BLUE][0].dfc = dfc
+                            self.players[BLUE][0].inventory = [(ITEMS[item] if item else 'null') for item in inventory.split(',')]
+                            self.players[BLUE][0].equipped_items = [(ITEMS[item] if item else ITEMS['null']) for item in equipped.split(',')]
+                            self.players[BLUE][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1], 'bonus_move': bonus[2], 'd_spd': bonus[3]}
+                            # self.players[BLUE][0].army = [(UNITS[unit] if unit else 'null') for unit in army.split(',')]
+                            self.players[BLUE][0].movepoints = movepoints
                         self.field[x][y] = Cell(content=self.players[BLUE][0])
                     else:
                         self.field[x][y] = Cell()
+
                 elif self.field[x][y] == 'Y':
                     if self.number_of_players >= 4:
                         self.players[YELLOW] = [Player(x, y, YELLOW)]
-                        self.field[x][y] = Cell(content=self.players[YELLOW][0])
+                        if (x, y) in data:
+                            atc, dfc, inventory, equipped, bonus, army, movepoints = data[(x, y)].split(';')
+                            bonus = list(map(int, bonus.split(',')))
+                            self.players[YELLOW][0].atc = atc
+                            self.players[YELLOW][0].dfc = dfc
+                            self.players[YELLOW][0].inventory = [(ITEMS[item] if item else 'null') for item in inventory.split(',')]
+                            self.players[YELLOW][0].equipped_items = [(ITEMS[item] if item else ITEMS['null']) for item in equipped.split(',')]
+                            self.players[YELLOW][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1], 'bonus_move': bonus[2], 'd_spd': bonus[3]}
+                            # self.players[YELLOW][0].army = [(UNITS[unit] if unit else 'null') for unit in army.split(',')]
+                            self.players[YELLOW][0].movepoints = movepoints
+                            self.field[x][y] = Cell(content=self.players[YELLOW][0])
                     else:
                         self.field[x][y] = Cell()
                 elif self.field[x][y] == '0':
@@ -586,6 +664,43 @@ class Field:  # Игровое поле
 
     def draw_frame(self):  # перерисовывает рамочку вокруг поля
         screen.blit(self.frame, (0, 0))
+
+    def save(self):
+        new_field = []
+        for x in range(self.height):
+            new_field.append('')
+            for y in range(self.width):
+                if type(self.field[x][y]).__name__ == 'Cell':
+                    cell = self.field[x][y]
+                    content = cell.get_content()
+                    if content is None:
+                        new_field[x] += '.'
+                    elif type(content).__name__ == 'Block':
+                        new_field[x] += '#'
+                    elif type(content).__name__ == 'Player':
+                        new_field[x] += content.team[0].upper()
+                        atc = content.atc
+                        dfc = content.dfc
+                        inventory = ','.join(map(lambda x: x.tile_type, content.inventory))
+                        equipped = ','.join(map(lambda x: x.tile_type, content.equipped_items))
+                        bonus = ','.join(map(str, content.bonus.values()))
+                        # army = ','.join(map(lambda x: x.tile_type, content.army))
+                        army = ''
+                        mp = content.movepoints
+                        new_field[x] += f'{{{atc};{dfc};{inventory};{equipped};{bonus};{army};{mp}}}'
+                    elif type(content).__name__ == 'Item':
+                        new_field[x] += '0'  # TODO: сохранение Item-ов
+                    elif type(content).__name__ == 'NPC':
+                        pass
+
+        file = open(os.path.join("data/saves", f"{self.save_slot}.txt"), 'w', encoding='utf-8')
+        file.write(self.game_name + '\n')
+        file.write(self.map_name + '\n')
+        file.write(';'.join(self.names) + '\n')
+        height = len(new_field)
+        for row in range(height):
+            file.write(''.join(new_field[row]) + '\n' * (row != height - 1))
+        file.close()
 
 
 class Unit(pygame.sprite.Sprite):
@@ -825,7 +940,7 @@ def fight(left_hero, right_hero):
 
 class Player(pygame.sprite.Sprite):
     default_image = pygame.transform.scale(load_image('player.png', -1), (tile_width, tile_height))
-    null_item = Item("", 0, 0, "all", "")
+    null_item = Item("", 0, 0, "", "all")
     null_unit = Unit("player.png", "", 0, 0, 0, 0, 0, 0, 0, "", False)
     moving_animation = itertools.cycle(
         [pygame.transform.scale(load_image(f'heroes/default/{i}.png'), (tile_width, tile_height)) for
@@ -840,12 +955,10 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.image.get_rect().move(tile_width * pos_x,
                                                tile_height * pos_y)
         self.pos = pos_x, pos_y
-        self.type = 'hero'
-        self.team = team
         self.atc, self.dfc = 0, 0
         self.xp, self.next_level = 0, 1000
         self.inventory = [Player.null_item] * 30
-        self.equiped_items = [Player.null_item] * 10
+        self.equipped_items = [Player.null_item] * 10
         self.bonus = {'sale': 1, 'd_hp': 0, 'bonus_move': 0, 'd_spd': 0}
         self.army = [Player.null_unit] * 7
         self.movepoints = 2000
@@ -858,15 +971,15 @@ class Player(pygame.sprite.Sprite):
         return self.pos
 
     def swap_item(self, other, slot):
-        if (self.equiped_items[slot].slot == other.slot) or self.equiped_items[slot] == \
+        if (self.equipped_items[slot].slot == other.slot) or self.equipped_items[slot] == \
                 Player.null_item or other == Player.null_item:
-            d_atc, d_dfc, d_feat = self.equiped_items[slot].equip_dequip()
+            d_atc, d_dfc, d_feat = self.equipped_items[slot].equip_dequip()
             self.atc, self.dfc = self.atc - d_atc, self.dfc - d_dfc
             for key, val in d_feat.items():
                 self.bonus[key] -= val
-            self.equiped_items[slot], self.inventory[self.inventory.index(Player.null_item)] = \
-                other, self.equiped_items[slot]
-            d_atc, d_dfc, d_feat = self.equiped_items[slot].equip_dequip()
+            self.equipped_items[slot], self.inventory[self.inventory.index(Player.null_item)] = \
+                other, self.equipped_items[slot]
+            d_atc, d_dfc, d_feat = self.equipped_items[slot].equip_dequip()
             self.atc, self.dfc = self.atc + d_atc, self.dfc + d_dfc
             for key, val in d_feat.items():
                 self.bonus[key] += val
@@ -883,13 +996,6 @@ class Player(pygame.sprite.Sprite):
                 row, col = self.get_pos()[::-1]
                 field.field[row][col].content = None
                 field.field[row][col].render(row, col)
-
-        elif type(other).__name__ == 'build':
-            if other.variety != 'town':  # Опять заглушка
-                d_atc, d_dfc, d_features = other.visit
-                self.atc, self.dfc = self.atc + d_atc, self.dfc + d_dfc
-                for key, val in d_features.items():
-                    self.bonus[key] += val
 
     def get_characteristics(self):
         return self.atc, self.dfc
@@ -1037,6 +1143,8 @@ class Button(pygame.sprite.Sprite):
 
 
 class InputBox(pygame.sprite.Sprite):
+    symbols = 'abcdefghijklmnopqrstuvwxyzабвгдеёжзийклмнопрстуфхцчшщъыьэюя1234567890_'
+
     def __init__(self, group, x, y, width, height, placeholder='',
                  font=pygame.font.Font('data/16478.otf', 24)):
         super().__init__(group)
@@ -1051,6 +1159,7 @@ class InputBox(pygame.sprite.Sprite):
         self.text = ''
         self.rect = pygame.rect.Rect(x, y, width, height)
         self.incorrect = False
+        self.max_length = None
 
     def on_click(self, event):
         self.active = False
@@ -1069,6 +1178,9 @@ class InputBox(pygame.sprite.Sprite):
     def set_incorrect(self, incorrect):
         self.incorrect = incorrect
 
+    def set_max_length(self, length):
+        self.max_length = length
+
     def set_background_image(self, filename):
         self.bgimage = load_image(filename)
         self.bgimage = pygame.transform.scale(self.bgimage, (self.width, self.height))
@@ -1081,9 +1193,10 @@ class InputBox(pygame.sprite.Sprite):
             self.active = False
         elif event.key == pygame.K_BACKSPACE:
             self.text = self.text[:-1]
-        else:
-            self.text += event.unicode
-            self.incorrect = False
+        elif event.unicode.lower() in InputBox.symbols:
+            if self.max_length is None or len(self.text) < self.max_length:
+                self.text += event.unicode
+                self.incorrect = False
 
     def update(self, *args):
         for arg in args:
@@ -1209,7 +1322,14 @@ class CheckBox(Button):
                              (1, 1, self.image.get_width() - 2, self.image.get_height() - 2), 3)
 
 
-def select_save_slot():
+def select_save_slot(mode):  # mode = "create" or "load"
+    global button_sprites
+    button_sprites_save = button_sprites.copy()
+    button_sprites.empty()
+
+    if mode not in ("create", "load"):
+        raise Exception(f"Incorrect select_save_slot mode: {mode}")
+
     font = pygame.font.Font('data/16478.otf', 24)
     slots_sprites = CheckBoxGroup()
 
@@ -1220,49 +1340,53 @@ def select_save_slot():
     black.set_alpha(200)
     screen.blit(black, (0, 0))
 
-    # Создаем экран боя
+    # Создаем экран для выбора
     width, height = WIDTH // 1.5, HEIGHT // 1.25
     topleft_coord = ((WIDTH - width) // 2, (HEIGHT - height) // 2)
     surface = pygame.Surface((width, height), flags=pygame.SRCALPHA)
     surface.blit(fon, (-100, -100))
-    slots = [None] * 10
-    files = os.listdir("data/saves")
-    files = list(filter(lambda x: x.endswith('.txt'), files))
+
     heading = font.render("Выберите слот для сохранения игры", True,
                           pygame.color.Color(156, 130, 79))
     surface.blit(heading, ((width - heading.get_width()) // 2, 10))
+
+    # загружаем файлы сохранения
+    files = os.listdir("data/saves")
+    files = list(filter(lambda x: x.endswith('.txt'), files))
+    slots = [None] * 10
     for filename in files:
-        f = open(os.path.join("data/saves", filename))
+        f = open(os.path.join("data/saves", filename), encoding='utf-8')
         data = f.read()
         f.close()
-        game_name, map_name, *field = data.split('\n')
+        game_name, map_name, names, *field = data.split('\n')
+        nplayers = len(names.split(';'))
         num = int(filename[:-4])
-        slots[num - 1] = game_name, map_name, field
-
-
-    ok_btn = Button(button_sprites, width // 2 )
+        slots[num - 1] = game_name, map_name, nplayers
 
     bwidth = width // 2.5
     bheight = (height - 150) // 7
     left, top = (width - bwidth * 2) // 3, 50
     for i in range(10):
         if i < 5:
-            slot = CheckBox(slots_sprites, str(i + 1), left, top + bheight * i * 1.5, bwidth, bheight)
+            slot = CheckBox(slots_sprites, str(i + 1), left, top + bheight * i * 1.5, bwidth,
+                            bheight)
         else:
             slot = CheckBox(slots_sprites, str(i + 1),
                             width - left - bwidth, top + bheight * (i % 5) * 1.5, bwidth, bheight)
         slot.set_background_color(pygame.color.Color(138, 15, 18, 200))
 
         if slots[i] is not None:
-            nplayers = 0
-            for row in slots[i][2]:
-                for col in row:
-                    if col in "GRBY":
-                        nplayers += 1
-            slot.set_text(slots[i][0] + '\nКарта: ' + slots[i][1] + '        Игроков: ' + str(nplayers), font, pygame.color.Color(156, 130, 79))
+            slot.set_text(f"{slots[i][0]}\nКарта: {slots[i][1]}        Игроков: {slots[i][2]}", font,
+                          pygame.color.Color(156, 130, 79))
         else:
             slot.set_text("Пустой слот", font, pygame.color.Color(156, 130, 79))
         slot.render()
+
+    ok_btn = Button(button_sprites, width // 3, top + bheight * 7.5 - 25, int(width // 3),
+                    int(bheight // 2))
+    ok_btn.set_background_image('button-background.jpg')
+    ok_btn.set_text("Подтвердить", font, pygame.color.Color(156, 130, 79))
+    ok_btn.render()
 
     while True:
         for event in pygame.event.get():
@@ -1270,8 +1394,82 @@ def select_save_slot():
                 terminate()
             if event.type == pygame.MOUSEMOTION or event.type == pygame.MOUSEBUTTONDOWN:
                 event.pos = (event.pos[0] - topleft_coord[0], event.pos[1] - topleft_coord[1])
+            if ok_btn.clicked:
+                selected = slots_sprites.get_checked()
+                if selected is not None:
+                    i = int(selected.name)
+                    if slots[i - 1] is not None:
+                        if mode == 'create':
+                            yes = dialog("Вы действительно хотите\nперезаписать сохранение?")
+                            if yes:
+                                button_sprites = button_sprites_save
+                                return i
+                        elif mode == 'load':
+                            button_sprites = button_sprites_save
+                            return i
+                    else:
+                        if mode == 'create':
+                            button_sprites = button_sprites_save
+                            return i
+                        elif mode == 'load':
+                            pass
+
             slots_sprites.update(event)
-            slots_sprites.draw(surface)
+            button_sprites.update(event)
+        slots_sprites.draw(surface)
+        button_sprites.draw(surface)
+        screen.blit(surface, topleft_coord)
+        pygame.display.flip()
+        clock.tick(FPS)
+
+
+def dialog(text):
+    font = pygame.font.Font('data/16478.otf', 32)
+
+    # Сохраняем основной экран и затемняем его
+    screen_save = screen.copy()
+    black = pygame.Surface((WIDTH, HEIGHT))
+    black.fill(pygame.color.Color(0, 0, 0))
+    black.set_alpha(200)
+    screen.blit(black, (0, 0))
+
+    # Создаем экран для выбора
+    width, height = 700, 300
+    topleft_coord = ((WIDTH - width) // 2, (HEIGHT - height) // 2)
+    surface = pygame.Surface((width, height), flags=pygame.SRCALPHA)
+    surface.blit(fon, (-100, -100))
+    text_coord = 20
+    for line in text.split('\n'):
+        rendered = font.render(line, True, pygame.color.Color(156, 130, 79))
+        text_coord += rendered.get_height() + 2
+        surface.blit(rendered, ((width - rendered.get_width()) // 2, text_coord))
+
+    bwidth, bheight = int(width // 2.5), height // 4
+    left, top = (width - bwidth * 2) // 3, height // 2
+
+    dialog_buttons = pygame.sprite.Group()
+    yes_btn = Button(dialog_buttons, width - left - bwidth, top, bwidth, bheight)
+    yes_btn.set_background_image('button-background.jpg')
+    yes_btn.set_text("Да", font, pygame.color.Color(156, 130, 79))
+    yes_btn.render()
+
+    no_btn = Button(dialog_buttons, left, top, bwidth, bheight)
+    no_btn.set_background_image('button-background.jpg')
+    no_btn.set_text("Нет", font, pygame.color.Color(156, 130, 79))
+    no_btn.render()
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            if event.type == pygame.MOUSEMOTION or event.type == pygame.MOUSEBUTTONDOWN:
+                event.pos = (event.pos[0] - topleft_coord[0], event.pos[1] - topleft_coord[1])
+            if yes_btn.clicked:
+                return True
+            if no_btn.clicked:
+                return False
+            dialog_buttons.update(event)
+        dialog_buttons.draw(surface)
         screen.blit(surface, topleft_coord)
         pygame.display.flip()
         clock.tick(FPS)
@@ -1319,12 +1517,13 @@ def start_screen():
                 return new_game()
             if continue_button.clicked or (
                     event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN):
-                return
+                return Field(select_save_slot('load'))
             button_sprites.update(event)
         screen.blit(fon, (0, 0))
         button_sprites.draw(screen)
         pygame.display.flip()
         clock.tick(FPS)
+
 
 # Создать новую игру (выбрать карту, количество игроков и т.д.)
 def new_game():
@@ -1340,21 +1539,25 @@ def new_game():
     # Поля для ввода имен игроков
     g_input = InputBox(inputbox_sprites, inp_x, y, bwidth, bheight, 'Имя')
     g_input.set_background_color(pygame.color.Color(27, 18, 12, 200))
+    g_input.set_max_length(16)
     g_input.render()
 
     r_input = InputBox(inputbox_sprites, inp_x, y + bheight * 1.5, bwidth, bheight, 'Имя')
     r_input.set_background_color(pygame.color.Color(27, 18, 12, 200))
     r_input.set_enabled(False)
+    r_input.set_max_length(16)
     r_input.render()
 
     b_input = InputBox(inputbox_sprites, inp_x, y + bheight * 3, bwidth, bheight, 'Имя')
     b_input.set_background_color(pygame.color.Color(27, 18, 12, 200))
     b_input.set_enabled(False)
+    b_input.set_max_length(16)
     b_input.render()
 
     y_input = InputBox(inputbox_sprites, inp_x, y + bheight * 4.5, bwidth, bheight, 'Имя')
     y_input.set_background_color(pygame.color.Color(27, 18, 12, 200))
     y_input.set_enabled(False)
+    y_input.set_max_length(16)
     y_input.render()
 
     # Цветные кружки возле полей для ввода для обозначения цвета команд
@@ -1375,6 +1578,8 @@ def new_game():
         checkbox.set_background_color(pygame.color.Color(138, 15, 18, 200))
         checkbox.set_checked(i == 0)
         checkbox.render()
+
+    font = pygame.font.Font('data/16478.otf', 48)
     description = font.render(MAPS[checkbox_sprites.get_checked().name].get_description(),
                               True, pygame.color.Color(156, 130, 79))
     preview_size = int(WIDTH - bwidth * 3.5), int(HEIGHT * 0.7)
@@ -1384,8 +1589,6 @@ def new_game():
     # Кнопка создания игры
     bwidth *= 1.5
     bheight *= 1.5
-
-    font = pygame.font.Font('data/16478.otf', 48)
 
     newgame_button = Button(button_sprites, map_x - bwidth // 6, int(y + 0.85 * HEIGHT - bheight),
                             int(bwidth), int(bheight))
@@ -1405,31 +1608,39 @@ def new_game():
     name_input = InputBox(inputbox_sprites, (WIDTH - bwidth) // 2, int(y + 0.85 * HEIGHT - bheight),
                           bwidth, bheight, 'Введите название игры')
     name_input.set_background_color(pygame.color.Color(27, 18, 12, 200))
+    name_input.set_max_length(42)
     name_input.render()
 
     while True:
+        map_name = checkbox_sprites.get_checked().name
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 terminate()
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE or goback_button.clicked:
                 return start_screen()
             if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN or newgame_button.clicked:
+                map_name = checkbox_sprites.get_checked().name
                 if not g_input.text:
                     g_input.set_incorrect(True)
                 elif not name_input.text:
                     name_input.set_incorrect(True)
                 else:
-                    save_slot = select_save_slot()
-                    return Field(MAPS[checkbox_sprites.get_checked().name], *filter(lambda x: x,
-                                                                                    (g_input.text,
-                                                                                     r_input.text,
-                                                                                     b_input.text,
-                                                                                     y_input.text)))
+                    save_slot = select_save_slot("create")  # Слот для сохранения
+                    file = open(os.path.join("data/saves", f"{save_slot}.txt"), 'w', encoding='utf-8')
+                    file.write(name_input.text + '\n')
+                    file.write(map_name + '\n')
+                    file.write(';'.join(filter(lambda x: x, (g_input.text, r_input.text, b_input.text, y_input.text))) + '\n')
+                    field = MAPS[map_name].load()
+                    height = len(field)
+                    for row in range(height):
+                        file.write(''.join(field[row]) + '\n' * (row != height - 1))
+                    file.close()
+                    return Field(save_slot)
+
             inputbox_sprites.update(event)
             button_sprites.update(event)
             checkbox_sprites.update(event)
-            description = font.render(MAPS[checkbox_sprites.get_checked().name].get_description(),
-                                      True, pygame.color.Color(156, 130, 79))
+            description = font.render(MAPS[map_name].get_description(), True, pygame.color.Color(156, 130, 79))
             preview = MAPS[checkbox_sprites.get_checked().name].get_preview(*preview_size)
         screen.blit(fon, (0, 0))
         screen.blit(circles, (inp_x - bheight - 10, y), special_flags=pygame.BLEND_ADD)
@@ -1481,6 +1692,9 @@ while running:
             if event.key == pygame.K_RIGHT:
                 right_counter = -hold_timeout
                 cam.right()
+            if event.key == pygame.K_s and ctrl_pressed:
+                field.save()
+
         elif event.type == pygame.KEYUP:
             if event.key == pygame.K_LCTRL:
                 ctrl_pressed = False
