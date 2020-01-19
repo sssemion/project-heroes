@@ -107,6 +107,87 @@ class Item:
         return self.name, self.d_atc, self.d_dfc, self.description, self.feature
 
 
+class Unit(pygame.sprite.Sprite):
+    def __init__(self, image, name, attack, defence, min_dmg, max_dmg, count, speed, hp, team,
+                 shoot):
+        super().__init__(unit_sprites)
+        self.image = load_image(image)
+        self.dead = 0
+        self.counter = True
+        self.top_hp = hp
+        self.team = team
+        self.shoot = shoot
+        self.count, self.name, self.atc, self.dfc, self.min_dmg, self.max_dmg, self.spd, self.hp = \
+            count, name, attack, defence, min_dmg, max_dmg, speed, hp
+        self.cur_atc, self.cur_dfc, self.cur_min_dmg, self.cur_max_dmg, self.cur_spd, self.cur_hp, self.cur_top_hp = \
+            attack, defence, min_dmg, max_dmg, speed, hp, hp
+
+    def attack_rat(self, enemy):
+        damage = random.randint(self.min_dmg, self.max_dmg) * (self.cur_atc / enemy.cur_dfc) * (
+                self.count + 1)
+        enemy.get_rat_damage(damage)
+
+    def attack_hon(self, enemy):
+        damage = random.randint(self.min_dmg, self.max_dmg) * (self.cur_atc / enemy.cur_dfc) * (
+                self.count + 1)
+        if enemy.counter:
+            enemy.get_honest_damage(damage, self)
+        else:
+            enemy.get_rat_damage(damage)
+
+    def get_honest_damage(self, damage, attacker):
+        self.count -= damage // self.hp
+        self.top_hp -= damage % self.hp
+        if self.count >= 0:
+            self.counter = False
+            attacker.get_rat_damage(
+                random.randint(self.min_dmg, self.max_dmg) * (self.cur_atc / attacker.cur_dfc) * (
+                        self.count + 1))
+        else:
+            self.dead = 1
+
+    def get_rat_damage(self, damage):
+        self.count -= damage // self.hp
+        self.top_hp -= damage % self.hp
+        if self.count < 0:
+            self.dead = 1
+
+    def hero_bonus(self, hero):
+        d_atc, d_dfc, d_features = hero.atc, hero.dfc, hero.bonus
+        self.cur_atc, self.cur_dfc, self.hp, self.cur_spd, self.cur_top_hp = \
+            self.cur_atc + d_atc, self.cur_dfc + d_dfc, self.hp + d_features['d_hp'], \
+            self.cur_spd + d_features['d_spd'], self.cur_top_hp + d_features['d_hp']
+
+    def update(self, updating_type='', *args):
+        if updating_type:
+            if updating_type == 'adjust-size':
+                width, height = args
+                self.image = pygame.transform.scale(self.image, (width, height))
+            # ... other types
+            else:
+                raise Exception(f'incorrect updating_type: {updating_type}')
+
+    def __lt__(self, other):
+        if self.spd < other.spd:
+            return True
+        return False
+
+    def __le__(self, other):
+        if self.spd <= other.spd:
+            return True
+        return False
+
+    def __gt__(self, other):
+        if self.spd > other.spd:
+            return True
+        return False
+
+    def __ge__(self, other):
+        if self.spd >= other.spd:
+            return True
+        return False
+
+
 # Библитека предметов
 ITEMS = {
     'club': Item('Дубина', 2, 0, "Мощная, но неудобная дубина огра", 'weapon', 'club'),
@@ -153,6 +234,24 @@ ITEMS = {
                 {'sale': 1}),
     'costring': Item('Лента дипломата', 0, 0, "Кольцо дипломата. Все идут за вами", 'other',
                      'ringcost', {'sale': 1}),
+}
+
+# Библиотека юнитов
+UNITS = {
+    'angel': Unit("units/angel", "Ангел", 13, 13, 50, 50, 1, 10, 250),
+    'fire': Unit("units/fire", "Огенный элементаль", 15, 10, 50, 50, 1, 10, 250),
+    'horn': Unit("units/horn", "Единорог", 12, 9, 50, 50, 1, 10, 250),
+    'cyclope': Unit("units/cyclope", "Циклоп", 10, 9, 50, 50, 1, 10, 250),
+
+    'pegas': Unit("units/pegas", "Пегас", 10, 10, 20, 30, 1, 12, 50),
+    'ogre': Unit("units/ogre", "Огр", 8, 10, 25, 40, 1, 6, 120),
+    'swordsman': Unit("units/swordsman", "Крестоносец", 9, 9, 30, 45, 1, 8, 90),
+    'earth': Unit("units/earth", "Земляной элементаль", 7, 7, 15, 50, 1, 5, 80),
+
+    'air': Unit("units/air", "Воздушный элемнатль", 5, 5, 10, 20, 1, 7, 20),
+    'goblin': Unit("units/goblin", "Гоблин", 7, 1, 15, 30, 1, 9, 15),
+    'gnom': Unit("units/gnom", "Гном", 3, 6, 50, 50, 1, 4, 30),
+    'pikeman': Unit("units/pikeman", "Копейщик", 2, 4, 10, 15, 1, 8, 40),
 }
 
 
@@ -494,87 +593,6 @@ class Field:  # Игровое поле
 
     def draw_frame(self):  # перерисовывает рамочку вокруг поля
         screen.blit(self.frame, (0, 0))
-
-
-class Unit(pygame.sprite.Sprite):
-    def __init__(self, image, name, attack, defence, min_dmg, max_dmg, count, speed, hp, team,
-                 shoot):
-        super().__init__(unit_sprites)
-        self.image = load_image(image)
-        self.dead = 0
-        self.counter = True
-        self.top_hp = hp
-        self.team = team
-        self.shoot = shoot
-        self.count, self.name, self.atc, self.dfc, self.min_dmg, self.max_dmg, self.spd, self.hp = \
-            count, name, attack, defence, min_dmg, max_dmg, speed, hp
-        self.cur_atc, self.cur_dfc, self.cur_min_dmg, self.cur_max_dmg, self.cur_spd, self.cur_hp, self.cur_top_hp = \
-            attack, defence, min_dmg, max_dmg, speed, hp, hp
-
-    def attack_rat(self, enemy):
-        damage = random.randint(self.min_dmg, self.max_dmg) * (self.cur_atc / enemy.cur_dfc) * (
-                self.count + 1)
-        enemy.get_rat_damage(damage)
-
-    def attack_hon(self, enemy):
-        damage = random.randint(self.min_dmg, self.max_dmg) * (self.cur_atc / enemy.cur_dfc) * (
-                self.count + 1)
-        if enemy.counter:
-            enemy.get_honest_damage(damage, self)
-        else:
-            enemy.get_rat_damage(damage)
-
-    def get_honest_damage(self, damage, attacker):
-        self.count -= damage // self.hp
-        self.top_hp -= damage % self.hp
-        if self.count >= 0:
-            self.counter = False
-            attacker.get_rat_damage(
-                random.randint(self.min_dmg, self.max_dmg) * (self.cur_atc / attacker.cur_dfc) * (
-                        self.count + 1))
-        else:
-            self.dead = 1
-
-    def get_rat_damage(self, damage):
-        self.count -= damage // self.hp
-        self.top_hp -= damage % self.hp
-        if self.count < 0:
-            self.dead = 1
-
-    def hero_bonus(self, hero):
-        d_atc, d_dfc, d_features = hero.atc, hero.dfc, hero.bonus
-        self.cur_atc, self.cur_dfc, self.hp, self.cur_spd, self.cur_top_hp = \
-            self.cur_atc + d_atc, self.cur_dfc + d_dfc, self.hp + d_features['d_hp'], \
-            self.cur_spd + d_features['d_spd'], self.cur_top_hp + d_features['d_hp']
-
-    def update(self, updating_type='', *args):
-        if updating_type:
-            if updating_type == 'adjust-size':
-                width, height = args
-                self.image = pygame.transform.scale(self.image, (width, height))
-            # ... other types
-            else:
-                raise Exception(f'incorrect updating_type: {updating_type}')
-
-    def __lt__(self, other):
-        if self.spd < other.spd:
-            return True
-        return False
-
-    def __le__(self, other):
-        if self.spd <= other.spd:
-            return True
-        return False
-
-    def __gt__(self, other):
-        if self.spd > other.spd:
-            return True
-        return False
-
-    def __ge__(self, other):
-        if self.spd >= other.spd:
-            return True
-        return False
 
 
 class FightBoard:
