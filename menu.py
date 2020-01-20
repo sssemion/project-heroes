@@ -968,7 +968,7 @@ class FightBoard:
 
     def get_click(self, mouse_pos):
         cell = self.get_cell(mouse_pos)
-        self.on_click(cell)
+        return self.on_click(cell)
 
     def get_cell(self, mouse_pos):
         if not (FightBoard.margin_left <= mouse_pos[
@@ -979,7 +979,6 @@ class FightBoard:
                 mouse_pos[0] - FightBoard.margin_left) // self.cell_width
 
     def on_click(self, cell):
-        print(self.board)
         if self.vars[cell[0]][cell[1]]:
             self.board[self.chosen_unit.fight_row][self.chosen_unit.fight_col], self.board[cell[0]][
                 cell[1]] = None, self.chosen_unit
@@ -990,9 +989,10 @@ class FightBoard:
                 if type(self.board[cell[0] + turn[0]][cell[1] + turn[1]]).__name__ == 'Unit' and not beat:
                     if self.board[cell[0]][cell[1]].fight_side != self.board[cell[0] + \
                                                                              turn[0]][cell[1] + turn[1]].fight_side:
-                        self.board[cell[0]][cell[1]].attack_hon(self.board[cell[0] + turn[0]][cell[1] + cell[1]])
+                        self.board[cell[0]][cell[1]].attack_hon(self.board[cell[0] + turn[0]][cell[1] + turn[1]])
                         beat = True
                         if self.chosen_unit.dead:
+                            self.board[self.chosen_unit.fight_row][self.chosen_unit.fight_col] = None
                             if self.chosen_unit.fight_side == 'left':
                                 self.alive_left.pop(
                                     [unit.name for unit in self.alive_left].index(self.chosen_unit.name))
@@ -1001,6 +1001,8 @@ class FightBoard:
                                     [unit.name for unit in self.alive_right].index(self.chosen_unit.name))
                             death = self.chosen_unit
                         elif self.board[cell[0]][cell[1]].dead:
+                            self.board[self.self.board[cell[0]][cell[1]].fight_row][
+                                self.self.board[cell[0]][cell[1]].fight_col] = None
                             if self.board[cell[0]][cell[1]].fight_side == 'left':
                                 self.alive_left.pop(
                                     [unit.name for unit in self.alive_left].index(self.board[cell[0]][cell[1]].name))
@@ -1011,10 +1013,13 @@ class FightBoard:
             self.draw_cells()
             if death:
                 self.queue = self.alive_left + self.alive_right
-
                 self.queue.sort()
             else:
                 self.queue = self.queue + [self.chosen_unit]
+            if not self.alive_left:
+                return 'right', self.alive_right
+            if not self.alive_right:
+                return 'left', self.alive_left
             self.chosen_unit = self.queue.pop(0)
             self.copy_board = [[(i.copy() if type(i).__name__ == 'Unit' else i) for i in j] for j in self.board]
             self.vars = self.voln(self.chosen_unit.fight_row, self.chosen_unit.fight_col, self.chosen_unit.spd,
