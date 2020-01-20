@@ -84,7 +84,6 @@ house_sprites = pygame.sprite.Group()
 inputbox_sprites = pygame.sprite.Group()
 
 
-
 class Item:
     def __init__(self, name, d_atc, d_dfc, description, slot, tile_type='coins', feature=None):
         self.name, self.d_atc, self.d_dfc, self.description, self.feature = name, d_atc, d_dfc, description, feature
@@ -98,7 +97,7 @@ class Item:
         return self.description
 
     def __eq__(self, other):
-        if self.name == other.name and self.d_atc == other.d_atc and self.d_dfc == other.d_dfc and self.description == other.description and self.feature == other.feature:
+        if self.slot == other.slot:
             return True
         return False
 
@@ -326,7 +325,7 @@ ITEMS = {
     'costring': Item('Лента дипломата', 0, 0, "Кольцо дипломата. Все идут за вами", 'other',
                      'costring', {'sale': 1}),
     'null': Item('', 0, 0, '', "all", "null"),
-    'coins': Item('coins', 0, 0, '', 0),
+    'coins': Item('coins', 0, 0, 'coins', 0),
 }
 
 # Библиотека карт
@@ -575,9 +574,12 @@ class Field:  # Игровое поле
                         bonus = list(map(int, bonus.split(',')))
                         self.players[GREEN][0].atc = atc
                         self.players[GREEN][0].dfc = dfc
-                        self.players[GREEN][0].inventory = [(ITEMS[item] if item else ITEMS['null']) for item in inventory.split(',')]
-                        self.players[GREEN][0].equipped_items = [(ITEMS[item] if item else ITEMS['null']) for item in equipped.split(',')]
-                        self.players[GREEN][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1], 'bonus_move': bonus[2], 'd_spd': bonus[3]}
+                        self.players[GREEN][0].inventory = [(ITEMS[item] if item else ITEMS['null']) for item in
+                                                            inventory.split(',')]
+                        self.players[GREEN][0].equipped_items = [(ITEMS[item] if item else ITEMS['null']) for item in
+                                                                 equipped.split(',')]
+                        self.players[GREEN][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1], 'bonus_move': bonus[2],
+                                                        'd_spd': bonus[3]}
                         # self.players[GREEN][0].army = [(UNITS[unit] if unit else 'null') for unit in army.split(',')]
                         self.players[GREEN][0].movepoints = movepoints
                     self.field[x][y] = Cell(content=self.players[GREEN][0])
@@ -590,9 +592,12 @@ class Field:  # Игровое поле
                             bonus = list(map(int, bonus.split(',')))
                             self.players[RED][0].atc = atc
                             self.players[RED][0].dfc = dfc
-                            self.players[RED][0].inventory = [(ITEMS[item] if item else ITEMS['null']) for item in inventory.split(',')]
-                            self.players[RED][0].equipped_items = [(ITEMS[item] if item else ITEMS['null']) for item in equipped.split(',')]
-                            self.players[RED][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1], 'bonus_move': bonus[2], 'd_spd': bonus[3]}
+                            self.players[RED][0].inventory = [(ITEMS[item] if item else ITEMS['null']) for item in
+                                                              inventory.split(',')]
+                            self.players[RED][0].equipped_items = [(ITEMS[item] if item else ITEMS['null']) for item in
+                                                                   equipped.split(',')]
+                            self.players[RED][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1], 'bonus_move': bonus[2],
+                                                          'd_spd': bonus[3]}
                             # self.players[RED][0].army = [(UNITS[unit] if unit else 'null') for unit in army.split(',')]
                             self.players[RED][0].movepoints = movepoints
                         self.field[x][y] = Cell(content=self.players[RED][0])
@@ -607,9 +612,12 @@ class Field:  # Игровое поле
                             bonus = list(map(int, bonus.split(',')))
                             self.players[BLUE][0].atc = atc
                             self.players[BLUE][0].dfc = dfc
-                            self.players[BLUE][0].inventory = [(ITEMS[item] if item else 'null') for item in inventory.split(',')]
-                            self.players[BLUE][0].equipped_items = [(ITEMS[item] if item else ITEMS['null']) for item in equipped.split(',')]
-                            self.players[BLUE][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1], 'bonus_move': bonus[2], 'd_spd': bonus[3]}
+                            self.players[BLUE][0].inventory = [(ITEMS[item] if item else 'null') for item in
+                                                               inventory.split(',')]
+                            self.players[BLUE][0].equipped_items = [(ITEMS[item] if item else ITEMS['null']) for item in
+                                                                    equipped.split(',')]
+                            self.players[BLUE][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1], 'bonus_move': bonus[2],
+                                                           'd_spd': bonus[3]}
                             # self.players[BLUE][0].army = [(UNITS[unit] if unit else 'null') for unit in army.split(',')]
                             self.players[BLUE][0].movepoints = movepoints
                         self.field[x][y] = Cell(content=self.players[BLUE][0])
@@ -624,9 +632,12 @@ class Field:  # Игровое поле
                             bonus = list(map(int, bonus.split(',')))
                             self.players[YELLOW][0].atc = atc
                             self.players[YELLOW][0].dfc = dfc
-                            self.players[YELLOW][0].inventory = [(ITEMS[item] if item else 'null') for item in inventory.split(',')]
-                            self.players[YELLOW][0].equipped_items = [(ITEMS[item] if item else ITEMS['null']) for item in equipped.split(',')]
-                            self.players[YELLOW][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1], 'bonus_move': bonus[2], 'd_spd': bonus[3]}
+                            self.players[YELLOW][0].inventory = [(ITEMS[item] if item else 'null') for item in
+                                                                 inventory.split(',')]
+                            self.players[YELLOW][0].equipped_items = [(ITEMS[item] if item else ITEMS['null']) for item
+                                                                      in equipped.split(',')]
+                            self.players[YELLOW][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1], 'bonus_move': bonus[2],
+                                                             'd_spd': bonus[3]}
                             # self.players[YELLOW][0].army = [(UNITS[unit] if unit else 'null') for unit in army.split(',')]
                             self.players[YELLOW][0].movepoints = movepoints
                         self.field[x][y] = Cell(content=self.players[YELLOW][0])
@@ -822,7 +833,6 @@ class Field:  # Игровое поле
                 new_field[x] += ';'
             new_field[x] = new_field[x][:-1]
 
-
         file = open(os.path.join("data/saves", f"{self.save_slot}.txt"), 'w', encoding='utf-8')
         file.write(self.game_name + '\n')
         file.write(self.map_name + '\n')
@@ -989,7 +999,7 @@ def fight(left_hero, right_hero):
 
 class Player(pygame.sprite.Sprite):
     default_image = pygame.transform.scale(load_image('player.png', -1), (tile_width, tile_height))
-    null_item = Item("", 0, 0, "", "all", 'null')
+    null_item = ITEMS['null']
     null_unit = Unit("player.png", "", 0, 0, 0, 0, 0, 0, 0)
     moving_animation = itertools.cycle(
         [pygame.transform.scale(load_image(f'heroes/default/{i}.png'), (tile_width, tile_height)) for
@@ -1004,10 +1014,16 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.image.get_rect().move(tile_width * pos_x,
                                                tile_height * pos_y)
         self.pos = pos_x, pos_y
-        self.atc, self.dfc = 0, 0
-        self.xp, self.next_level = 0, 1000
-        self.inventory = [Player.null_item] * 30
-        self.equipped_items = [Player.null_item] * 10
+        self.atc, self.dfc = 1, 1
+        self.equipped_weapon = Player.null_item
+        self.equipped_shield = Player.null_item
+        self.equipped_helmet = Player.null_item
+        self.equipped_boots = Player.null_item
+        self.equipped_chest = Player.null_item
+        self.equipped_items = [self.equipped_weapon, self.equipped_shield, self.equipped_helmet, self.equipped_boots,
+                               self.equipped_chest]
+        self.money = 0
+        self.inventory = self.equipped_items + [self.money]
         self.bonus = {'sale': 1, 'd_hp': 0, 'bonus_move': 0, 'd_spd': 0}
         self.army = [Player.null_unit] * 7
         self.movepoints = 2000
@@ -1019,32 +1035,41 @@ class Player(pygame.sprite.Sprite):
     def get_pos(self):
         return self.pos
 
-    def swap_item(self, other, slot):
-        if (self.equipped_items[slot].slot == other.slot) or self.equipped_items[slot] == \
-                Player.null_item or other == Player.null_item:
-            d_atc, d_dfc, d_feat = self.equipped_items[slot].equip_dequip()
-            self.atc, self.dfc = self.atc - d_atc, self.dfc - d_dfc
-            for key, val in d_feat.items():
-                self.bonus[key] -= val
-            self.equipped_items[slot], self.inventory[self.inventory.index(Player.null_item)] = \
-                other, self.equipped_items[slot]
-            d_atc, d_dfc, d_feat = self.equipped_items[slot].equip_dequip()
-            self.atc, self.dfc = self.atc + d_atc, self.dfc + d_dfc
-            for key, val in d_feat.items():
-                self.bonus[key] += val
-            return True
-        return False
-
     def interact(self, other):
         if type(other).__name__ == 'Player':
             if other.team != self.team:
                 fight(self, other)
         elif type(other).__name__ == 'Item':
-            if Player.null_item in self.inventory:
-                self.inventory[self.inventory.index(Player.null_item)] = other
-                row, col = self.get_pos()[::-1]
-                field.field[row][col].content = None
-                field.field[row][col].render(row, col)
+            # Обычные предметы меняются на лучшие версии себя
+            if other.slot == 'boots' and other.d_atc > self.equipped_boots.d_atc:
+                self.atc, self.dfc = self.atc - self.equipped_boots.d_atc, self.dfc - self.equipped_boots.d_dfc
+                self.equipped_boots = other
+                self.atc, self.dfc = self.atc + self.equipped_boots.d_atc, self.dfc + self.equipped_boots.d_dfc
+            elif other.slot == 'chest' and other.d_atc > self.equipped_chest.d_atc:
+                self.atc, self.dfc = self.atc - self.equipped_chest.d_atc, self.dfc - self.equipped_chest.d_dfc
+                self.equipped_chest = other
+                self.atc, self.dfc = self.atc + self.equipped_chest.d_atc, self.dfc + self.equipped_chest.d_dfc
+            elif other.slot == 'helm' and other.d_dfc > self.equipped_helmet.d_dfc:
+                self.atc, self.dfc = self.atc - self.equipped_helmet.d_atc, self.dfc - self.equipped_helmet.d_dfc
+                self.equipped_helmet = other
+                self.atc, self.dfc = self.atc + self.equipped_helmet.d_atc, self.dfc + self.equipped_helmet.d_dfc
+            elif other.slot == 'weapon' and other.d_atc > self.equipped_weapon.d_atc:
+                self.atc, self.dfc = self.atc - self.equipped_weapon.d_atc, self.dfc - self.equipped_weapon.d_dfc
+                self.equipped_weapon = other
+                self.atc, self.dfc = self.atc + self.equipped_weapon.d_atc, self.dfc + self.equipped_weapon.d_dfc
+            elif other.slot == 'shield' and other.d_dfc > self.equipped_shield.d_dfc:
+                self.atc, self.dfc = self.atc - self.equipped_shield.d_atc, self.dfc - self.equipped_shield.d_dfc
+                self.equipped_shield = other
+                self.atc, self.dfc = self.atc + self.equipped_shield.d_atc, self.dfc + self.equipped_shield.d_dfc
+            # НЕОбычные предметы меняются на лучшие версии себя
+            elif other.slot == 'other':
+                key, val = other.feature.keys()[0], other.feature.values()[0]
+                self.bonus[key] = self.bonus[key] + val
+            elif other.slot == 'coins':
+                self.money += 1
+            row, col = self.get_pos()[::-1]
+            field.field[row][col].content = None
+            field.field[row][col].render(row, col)
         elif type(other).__name__ == 'House':
             other.visit(self)
 
@@ -1083,10 +1108,13 @@ class Player(pygame.sprite.Sprite):
 class House(pygame.sprite.Sprite):
     def __init__(self, row, col, image_name, unit, cost, delta):
         self.unit, self.cost, self.delta = unit, cost, delta
+        self.unit.count = delta
+        self.bought = False
         super().__init__(house_sprites)
         self.image = pygame.transform.scale(load_image("homes/" + image_name),
                                             (tile_width, tile_height))
         self.rect = self.image.get_rect().move(col * tile_width, row * tile_height)
+        self.sprites_button = pygame.sprite.Group()
 
     def visit(self, visitor: Player):
         # Сохраняем основной экран и затемняем его
@@ -1101,12 +1129,26 @@ class House(pygame.sprite.Sprite):
         topleft_coord = ((WIDTH - width) // 2, (HEIGHT - height) // 2)
         surface = pygame.Surface((width, height))
         surface.blit(fon, (-100, -100))
+        attempt = False
+
         font_name = pygame.font.Font('data/HoMMFontCyr.ttf', 26)
         font_aff = pygame.font.Font('data/HoMMFontCyr.ttf', 20)
         name = font_name.render(f"Жилище {self.unit.name}", 10, (156, 130, 79))
-        afford = font_aff.render(f"Желаете купить {self.delta} {self.unit.name} за {self.cost} золота?", 10,
-                                 (156, 130, 79))
-        button_agree = Button()
+        afford = font_aff.render(
+            f"Желаете купить {self.delta} {self.unit.name} за {self.cost // visitor.bonus['sale']} золота?", 10,
+            (156, 130, 79))
+        reject = font_aff.render(f"Извините, но сейчас вы не можете купить {self.unit.name}", 10, (156, 130, 79))
+        congratulation = font_aff.render(f"Поздравляем, вы купили {self.unit.name}", 10, (156, 130, 79))
+        current_text = afford
+
+        button_agree = Button(self.sprites_button, 10, int(HEIGHT / 3) - 60,
+                              50, 50)
+        button_agree.set_background_image("agree.png")
+        button_agree.render()
+        button_disagree = Button(self.sprites_button, int(WIDTH / 2.5) - 60,
+                                 int(HEIGHT / 3) - 60, 50, 50)
+        button_disagree.set_background_image("disagree.png")
+        button_disagree.render()
 
         while True:
             for event in pygame.event.get():
@@ -1116,8 +1158,28 @@ class House(pygame.sprite.Sprite):
                     if event.key == pygame.K_ESCAPE:
                         screen.blit(screen_save, (0, 0))
                         return
+                if (button_agree.clicked and attempt) or button_disagree.clicked:
+                    screen.blit(screen_save, (0, 0))
+                    return
+                if button_agree.clicked and not attempt:
+                    attempt = True
+                    current_text = reject
+                    if self.cost // visitor.bonus['sale'] <= visitor.money and not self.bought:
+                        if Player.null_unit in visitor.army:
+                            visitor.army[visitor.army.index(Player.null_unit)] = self.unit
+                            visitor.money -= self.cost // visitor.bonus['sale']
+                            current_text = congratulation
+                            self.bought = True
+                        elif self.unit.name in [unit.name for unit in visitor.army] and  not self.bought:
+                            visitor.army[[unit.name for unit in visitor.army].index(self.unit.name)] = \
+                                visitor.army[[unit.name for unit in visitor.army].index(self.unit.name)] + self.unit
+                            visitor.money -= self.cost // visitor.bonus['sale']
+                            current_text = congratulation
+                            self.bought = True
+
             surface.blit(name, (10, 10))
-            surface.blit(afford, (10, 60))
+            surface.blit(current_text, (10, 60))
+            self.sprites_button.draw(surface)
             screen.blit(surface, topleft_coord)
             pygame.display.flip()
             clock.tick(FPS)
@@ -1194,7 +1256,7 @@ class Button(pygame.sprite.Sprite):
         self.function = function
 
     def set_background_image(self, filename):
-        self.bgimage = load_image(filename)
+        self.bgimage = load_image(filename, -1)
         self.bgimage = pygame.transform.scale(self.bgimage, (self.width, self.height))
 
     def set_background_color(self, color: pygame.Color):
@@ -1723,7 +1785,8 @@ def new_game():
                     file = open(os.path.join("data/saves", f"{save_slot}.txt"), 'w', encoding='utf-8')
                     file.write(name_input.text + '\n')
                     file.write(map_name + '\n')
-                    file.write(';'.join(filter(lambda x: x, (g_input.text, r_input.text, b_input.text, y_input.text))) + '\n')
+                    file.write(
+                        ';'.join(filter(lambda x: x, (g_input.text, r_input.text, b_input.text, y_input.text))) + '\n')
                     field = MAPS[map_name].load()
                     height = len(field)
                     for row in range(height):
