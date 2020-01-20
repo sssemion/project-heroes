@@ -186,7 +186,8 @@ class Unit(pygame.sprite.Sprite):
                 raise Exception(f'incorrect updating_type: {updating_type}')
 
     def copy(self):
-        return Unit(self.image_filename, self.name, self.atc, self.dfc, self.min_dmg, self.max_dmg, self.count,
+        return Unit(self.image_filename, self.name, self.atc, self.dfc, self.min_dmg, self.max_dmg,
+                    self.count,
                     self.spd, self.hp)
 
     def __lt__(self, other):
@@ -296,13 +297,15 @@ class Map:
                                                                  (tile_width, tile_height)),
                                           (y * tile_width, x * tile_height))
                     elif content in ITEMS:
-                        self.preview.blit(pygame.transform.scale(Tile.tile_images[ITEMS[content].tile_type],
-                                                                 (tile_width, tile_height)),
-                                          (y * tile_width, x * tile_height))
+                        self.preview.blit(
+                            pygame.transform.scale(Tile.tile_images[ITEMS[content].tile_type],
+                                                   (tile_width, tile_height)),
+                            (y * tile_width, x * tile_height))
                     elif building in HOUSES:
-                        self.preview.blit(pygame.transform.scale(load_image(os.path.join("homes", building + '.png')),
-                                                                 (tile_width, tile_height)),
-                                          (y * tile_width, x * tile_height))
+                        self.preview.blit(pygame.transform.scale(
+                            load_image(os.path.join("homes", building + '.png')),
+                            (tile_width, tile_height)),
+                            (y * tile_width, x * tile_height))
 
             if w * tile_width / width > h * tile_height / height:
                 self.preview = pygame.transform.scale(self.preview, (width, int(h * tile_height *
@@ -663,8 +666,10 @@ class Field:  # Игровое поле
                     if (x, y) in data:
                         weapon, shield, helmet, boots, chest, bonus, army, movepoints, money = \
                             data[(x, y)].split('&')
-                        atc = sum(map(lambda x: ITEMS[x].d_atc, (weapon, shield, helmet, boots, chest)))
-                        dfc = sum(map(lambda x: ITEMS[x].d_dfc, (weapon, shield, helmet, boots, chest)))
+                        atc = sum(
+                            map(lambda x: ITEMS[x].d_atc, (weapon, shield, helmet, boots, chest)))
+                        dfc = sum(
+                            map(lambda x: ITEMS[x].d_dfc, (weapon, shield, helmet, boots, chest)))
                         bonus = list(map(int, bonus.split(',')))
                         self.players[GREEN][0].atc = atc
                         self.players[GREEN][0].dfc = dfc
@@ -673,9 +678,11 @@ class Field:  # Игровое поле
                         self.players[GREEN][0].equipped_helmet = helmet
                         self.players[GREEN][0].equipped_boots = boots
                         self.players[GREEN][0].equipped_chest = chest
-                        self.players[GREEN][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1], 'bonus_move': bonus[2],
+                        self.players[GREEN][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1],
+                                                        'bonus_move': bonus[2],
                                                         'd_spd': bonus[3]}
-                        self.players[GREEN][0].army = [(UNITS[unit].copy() if unit else 'null') for unit in
+                        self.players[GREEN][0].army = [(UNITS[unit].copy() if unit else 'null') for
+                                                       unit in
                                                        army.split(',')]
                         self.players[GREEN][0].movepoints = int(movepoints)
                         self.players[GREEN][0].money = int(money)
@@ -699,9 +706,11 @@ class Field:  # Игровое поле
                             self.players[RED][0].equipped_helmet = helmet
                             self.players[RED][0].equipped_boots = boots
                             self.players[RED][0].equipped_chest = chest
-                            self.players[RED][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1], 'bonus_move': bonus[2],
+                            self.players[RED][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1],
+                                                          'bonus_move': bonus[2],
                                                           'd_spd': bonus[3]}
-                            self.players[RED][0].army = [(UNITS[unit].copy() if unit else 'null') for unit in
+                            self.players[RED][0].army = [(UNITS[unit].copy() if unit else 'null') for
+                                                         unit in
                                                          army.split(',')]
                             self.players[RED][0].movepoints = int(movepoints)
                             self.players[RED][0].money = int(money)
@@ -713,8 +722,9 @@ class Field:  # Игровое поле
                     if self.number_of_players >= 3:
                         self.players[BLUE] = [Player(x, y, BLUE)]
                         if (x, y) in data:
-                            weapon, shield, helmet, boots, chest, bonus, army, movepoints, money = data[
-                                (x, y)].split('&')
+                            weapon, shield, helmet, boots, chest, bonus, army, movepoints, money = \
+                                data[
+                                    (x, y)].split('&')
                             atc = sum(map(lambda x: ITEMS[x].d_atc,
                                           (weapon, shield, helmet, boots, chest)))
                             dfc = sum(map(lambda x: ITEMS[x].d_dfc,
@@ -727,9 +737,11 @@ class Field:  # Игровое поле
                             self.players[BLUE][0].equipped_helmet = helmet
                             self.players[BLUE][0].equipped_boots = boots
                             self.players[BLUE][0].equipped_chest = chest
-                            self.players[BLUE][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1], 'bonus_move': bonus[2],
+                            self.players[BLUE][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1],
+                                                           'bonus_move': bonus[2],
                                                            'd_spd': bonus[3]}
-                            self.players[BLUE][0].army = [(UNITS[unit].copy() if unit else 'null') for unit in
+                            self.players[BLUE][0].army = [(UNITS[unit].copy() if unit else 'null')
+                                                          for unit in
                                                           army.split(',')]
                             self.players[BLUE][0].movepoints = int(movepoints)
                             self.players[BLUE][0].money = int(money)
@@ -741,8 +753,9 @@ class Field:  # Игровое поле
                     if self.number_of_players >= 4:
                         self.players[YELLOW] = [Player(x, y, YELLOW)]
                         if (x, y) in data:
-                            weapon, shield, helmet, boots, chest, bonus, army, movepoints, money = data[
-                                (x, y)].split('&')
+                            weapon, shield, helmet, boots, chest, bonus, army, movepoints, money = \
+                                data[
+                                    (x, y)].split('&')
                             atc = sum(map(lambda x: ITEMS[x].d_atc,
                                           (weapon, shield, helmet, boots, chest)))
                             dfc = sum(map(lambda x: ITEMS[x].d_dfc,
@@ -755,9 +768,11 @@ class Field:  # Игровое поле
                             self.players[YELLOW][0].equipped_helmet = helmet
                             self.players[YELLOW][0].equipped_boots = boots
                             self.players[YELLOW][0].equipped_chest = chest
-                            self.players[YELLOW][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1], 'bonus_move': bonus[2],
+                            self.players[YELLOW][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1],
+                                                             'bonus_move': bonus[2],
                                                              'd_spd': bonus[3]}
-                            self.players[YELLOW][0].army = [(UNITS[unit].copy() if unit else 'null') for unit in
+                            self.players[YELLOW][0].army = [(UNITS[unit].copy() if unit else 'null')
+                                                            for unit in
                                                             army.split(',')]
                             self.players[YELLOW][0].movepoints = int(movepoints)
                             self.players[YELLOW][0].money = int(money)
@@ -995,9 +1010,11 @@ class FightBoard:
         self.queue = left + right
         self.queue.sort()
         self.chosen_unit = self.queue.pop(0)
-        self.copy_board = [[(i.copy() if type(i).__name__ == 'Unit' else i) for i in j] for j in self.board]
+        self.copy_board = [[(i.copy() if type(i).__name__ == 'Unit' else i) for i in j] for j in
+                           self.board]
         print(id(self.copy_board[0][0]) == id(self.board[0][0]))
-        self.vars = self.voln(self.chosen_unit.fight_row, self.chosen_unit.fight_col, self.chosen_unit.spd,
+        self.vars = self.voln(self.chosen_unit.fight_row, self.chosen_unit.fight_col,
+                              self.chosen_unit.spd,
                               self.copy_board)
         self.width = width
         self.height = height
@@ -1008,10 +1025,12 @@ class FightBoard:
 
     def draw_cells(self):
         self.surface.blit(
-            pygame.transform.scale(load_image('fight-background.jpg'), (self.width, self.height)), (0, 0))
+            pygame.transform.scale(load_image('fight-background.jpg'), (self.width, self.height)),
+            (0, 0))
         self.rows = len(self.board)
         self.cols = len(self.board[0])
-        self.cell_width = (self.width - FightBoard.margin_left - FightBoard.margin_right) // self.cols
+        self.cell_width = (
+                                  self.width - FightBoard.margin_left - FightBoard.margin_right) // self.cols
         self.cell_height = (
                                    self.height - FightBoard.margin_top - FightBoard.margin_bottom) // self.rows
         cells_surface = pygame.Surface(
@@ -1051,7 +1070,8 @@ class FightBoard:
     def get_cell(self, mouse_pos):
         if not (FightBoard.margin_left <= mouse_pos[
             0] <= FightBoard.margin_left + self.width * self.cell_width) or not (
-                FightBoard.margin_top <= mouse_pos[1] <= FightBoard.margin_top + self.height * self.cell_height):
+                FightBoard.margin_top <= mouse_pos[
+            1] <= FightBoard.margin_top + self.height * self.cell_height):
             return None
         return (mouse_pos[1] - FightBoard.margin_top) // self.cell_height, (
                 mouse_pos[0] - FightBoard.margin_left) // self.cell_width
@@ -1060,33 +1080,41 @@ class FightBoard:
         if self.vars[cell[0]][cell[1]]:
             self.board[self.chosen_unit.fight_row][self.chosen_unit.fight_col], self.board[cell[0]][
                 cell[1]] = None, self.chosen_unit
-            self.board[cell[0]][cell[1]].fight_row, self.board[cell[0]][cell[1]].fight_col = cell[0], cell[1]
+            self.board[cell[0]][cell[1]].fight_row, self.board[cell[0]][cell[1]].fight_col = cell[0], \
+                                                                                             cell[1]
             beat = False
             death = 0
             for turn in self.possible_turns(cell[0], cell[1]):
-                if type(self.board[cell[0] + turn[0]][cell[1] + turn[1]]).__name__ == 'Unit' and not beat:
+                if type(self.board[cell[0] + turn[0]][
+                            cell[1] + turn[1]]).__name__ == 'Unit' and not beat:
                     if self.board[cell[0]][cell[1]].fight_side != self.board[cell[0] + \
-                                                                             turn[0]][cell[1] + turn[1]].fight_side:
-                        self.board[cell[0]][cell[1]].attack_hon(self.board[cell[0] + turn[0]][cell[1] + turn[1]])
+                                                                             turn[0]][
+                        cell[1] + turn[1]].fight_side:
+                        self.board[cell[0]][cell[1]].attack_hon(
+                            self.board[cell[0] + turn[0]][cell[1] + turn[1]])
                         beat = True
                         if self.chosen_unit.dead:
                             self.board[self.chosen_unit.fight_row][self.chosen_unit.fight_col] = None
                             if self.chosen_unit.fight_side == 'left':
                                 self.alive_left.pop(
-                                    [unit.name for unit in self.alive_left].index(self.chosen_unit.name))
+                                    [unit.name for unit in self.alive_left].index(
+                                        self.chosen_unit.name))
                             elif self.chosen_unit.fight_side == 'right':
                                 self.alive_right.pop(
-                                    [unit.name for unit in self.alive_right].index(self.chosen_unit.name))
+                                    [unit.name for unit in self.alive_right].index(
+                                        self.chosen_unit.name))
                             death = self.chosen_unit
                         elif self.board[cell[0]][cell[1]].dead:
                             self.board[self.self.board[cell[0]][cell[1]].fight_row][
                                 self.self.board[cell[0]][cell[1]].fight_col] = None
                             if self.board[cell[0]][cell[1]].fight_side == 'left':
                                 self.alive_left.pop(
-                                    [unit.name for unit in self.alive_left].index(self.board[cell[0]][cell[1]].name))
+                                    [unit.name for unit in self.alive_left].index(
+                                        self.board[cell[0]][cell[1]].name))
                             elif self.chosen_unit.fight_side == 'right':
                                 self.alive_right.pop(
-                                    [unit.name for unit in self.alive_right].index(self.board[cell[0]][cell[1]].name))
+                                    [unit.name for unit in self.alive_right].index(
+                                        self.board[cell[0]][cell[1]].name))
                             death = self.board[cell[0]][cell[1]]
             self.draw_cells()
             if death:
@@ -1099,8 +1127,10 @@ class FightBoard:
             if not self.alive_right:
                 return 'left', self.alive_left
             self.chosen_unit = self.queue.pop(0)
-            self.copy_board = [[(i.copy() if type(i).__name__ == 'Unit' else i) for i in j] for j in self.board]
-            self.vars = self.voln(self.chosen_unit.fight_row, self.chosen_unit.fight_col, self.chosen_unit.spd,
+            self.copy_board = [[(i.copy() if type(i).__name__ == 'Unit' else i) for i in j] for j in
+                               self.board]
+            self.vars = self.voln(self.chosen_unit.fight_row, self.chosen_unit.fight_col,
+                                  self.chosen_unit.spd,
                                   self.copy_board)
 
     def possible_turns(self, WantRow, WantColumn):
@@ -1243,8 +1273,10 @@ def fight(left_hero, right_hero):
                 x, y = pygame.mouse.get_pos()
                 x -= topleft_coord[0]
                 y -= topleft_coord[1]
-                fight_board.get_click((x, y))
-        # fight_board.draw_cells()
+                a = fight_board.get_click((x, y))
+                if a is not None:
+                    return a
+                    # fight_board.draw_cells()
         fight_board.draw_units()
         screen.blit(fight_board.surface, topleft_coord)
         pygame.display.flip()
@@ -1253,7 +1285,7 @@ def fight(left_hero, right_hero):
 
 class Player(pygame.sprite.Sprite):
     default_image = pygame.transform.scale(load_image('player.png', -1), (tile_width, tile_height))
-    null_unit = UNITS["null"] #Unit("player.png", "", 0, 0, 0, 0, 0, 0, 0)
+    null_unit = UNITS["null"]  # Unit("player.png", "", 0, 0, 0, 0, 0, 0, 0)
     null_item = ITEMS["null"]
     moving_animation = itertools.cycle(
         [pygame.transform.scale(load_image(f'heroes/default/{i}.png'), (tile_width, tile_height)) for
@@ -1274,7 +1306,8 @@ class Player(pygame.sprite.Sprite):
         self.equipped_helmet = Player.null_item
         self.equipped_boots = Player.null_item
         self.equipped_chest = Player.null_item
-        equipped_items = [self.equipped_weapon, self.equipped_shield, self.equipped_helmet, self.equipped_boots,
+        equipped_items = [self.equipped_weapon, self.equipped_shield, self.equipped_helmet,
+                          self.equipped_boots,
                           self.equipped_chest]
         self.money = 0
         self.inventory = equipped_items + [self.money]
@@ -1292,7 +1325,25 @@ class Player(pygame.sprite.Sprite):
     def interact(self, other):
         if type(other).__name__ == 'Player':
             if other.team != self.team:
-                fight(self, other)
+                res = fight(self, other)
+                if res[0] == 'left':
+                    field.field[self.pos[1]][self.pos[0]].content = other
+                    other.army = []
+                    for i in range(7):
+                        if i <= len(res[1]) - 1:
+                            other.army.append(res[1][i])
+                        else:
+                            other.army.append(Player.null_unit)
+                    field.field[self.pos[1]][self.pos[0]].render(self.pos[0], self.pos[1])
+                elif res[0] == 'right':
+                    field.field[self.pos[1]][self.pos[0]].content = self
+                    self.army = []
+                    for i in range(7):
+                        if i <= len(res[1]) - 1:
+                            other.army.append(res[1][i])
+                        else:
+                            other.army.append(Player.null_unit)
+                    field.field[self.pos[1]][self.pos[0]].render(self.pos[0], self.pos[1])
         elif type(other).__name__ == 'Item':
             # Обычные предметы меняются на лучшие версии себя
             if other.slot == 'boots' and other.d_atc > self.equipped_boots.d_atc:
@@ -1390,10 +1441,13 @@ class House(pygame.sprite.Sprite):
         font_aff = pygame.font.Font('data/16478.otf', 18)
         name = font_name.render(f"Жилище {self.unit.name}", 10, (156, 130, 79))
         afford = font_aff.render(
-            f"Желаете купить {self.delta} {self.unit.name} за {self.cost // visitor.bonus['sale']} золота?", 10,
+            f"Желаете купить {self.delta} {self.unit.name} за {self.cost // visitor.bonus['sale']} золота?",
+            10,
             (156, 130, 79))
-        reject = font_aff.render(f"Извините, но сейчас вы не можете купить {self.unit.name}", 10, (156, 130, 79))
-        congratulation = font_aff.render(f"Поздравляем, вы купили {self.unit.name}", 10, (156, 130, 79))
+        reject = font_aff.render(f"Извините, но сейчас вы не можете купить {self.unit.name}", 10,
+                                 (156, 130, 79))
+        congratulation = font_aff.render(f"Поздравляем, вы купили {self.unit.name}", 10,
+                                         (156, 130, 79))
         current_text = afford
 
         button_agree = Button(self.sprites_button, 10, int(HEIGHT / 3) - 60,
@@ -1423,14 +1477,18 @@ class House(pygame.sprite.Sprite):
                     current_text = reject
                     if self.cost // visitor.bonus['sale'] <= visitor.money and not self.bought:
                         if Player.null_unit.name in [unit.name for unit in visitor.army]:
-                            visitor.army[[unit.name for unit in visitor.army].index(Player.null_unit.name)] = self.unit
+                            visitor.army[[unit.name for unit in visitor.army].index(
+                                Player.null_unit.name)] = self.unit
                             visitor.money -= self.cost // visitor.bonus['sale']
                             current_text = congratulation
                             self.bought = True
-                        elif self.unit.name in [unit.name for unit in visitor.army] and not self.bought and self.cost // \
+                        elif self.unit.name in [unit.name for unit in
+                                                visitor.army] and not self.bought and self.cost // \
                                 visitor.bonus['sale'] <= visitor.money:
-                            visitor.army[[unit.name for unit in visitor.army].index(self.unit.name)] = \
-                                visitor.army[[unit.name for unit in visitor.army].index(self.unit.name)] + self.unit
+                            visitor.army[
+                                [unit.name for unit in visitor.army].index(self.unit.name)] = \
+                                visitor.army[[unit.name for unit in visitor.army].index(
+                                    self.unit.name)] + self.unit
                             visitor.money -= self.cost // visitor.bonus['sale']
                             current_text = congratulation
                             self.bought = True
@@ -1915,7 +1973,7 @@ def start_screen():
     continue_button.render()
 
     exit_button = Button(button_sprites, (WIDTH - bwidth) // 2,
-                             (HEIGHT - bheight * -0.5) // 2, bwidth, bheight, terminate)
+                         (HEIGHT - bheight * -0.5) // 2, bwidth, bheight, terminate)
     exit_button.set_background_image('button-background.jpg')
     exit_button.set_text("Выйти", font, pygame.color.Color(32, 32, 32))
     exit_button.render()
@@ -2038,10 +2096,12 @@ def new_game():
                     name_input.set_incorrect(True)
                 else:
                     save_slot = select_save_slot("create")  # Слот для сохранения
-                    file = open(os.path.join("data/saves", f"{save_slot}.txt"), 'w', encoding='utf-8')
+                    file = open(os.path.join("data/saves", f"{save_slot}.txt"), 'w',
+                                encoding='utf-8')
                     file.write(name_input.text + '\n')
                     file.write(map_name + '\n')
-                    file.write(';'.join(filter(lambda x: x, (g_input.text, r_input.text, b_input.text, y_input.text))) + '\n')
+                    file.write(';'.join(filter(lambda x: x, (
+                        g_input.text, r_input.text, b_input.text, y_input.text))) + '\n')
                     field = MAPS[map_name].load()
                     height = len(field)
                     for row in range(height):
@@ -2052,7 +2112,8 @@ def new_game():
             inputbox_sprites.update(event)
             button_sprites.update(event)
             checkbox_sprites.update(event)
-            description = font.render(MAPS[map_name].get_description(), True, pygame.color.Color(156, 130, 79))
+            description = font.render(MAPS[map_name].get_description(), True,
+                                      pygame.color.Color(156, 130, 79))
             preview = MAPS[checkbox_sprites.get_checked().name].get_preview(*preview_size)
         screen.blit(fon, (0, 0))
         screen.blit(circles, (inp_x - bheight - 10, y), special_flags=pygame.BLEND_ADD)
@@ -2075,13 +2136,13 @@ fon = pygame.transform.scale(load_image('background.jpg'), (WIDTH, HEIGHT))
 field = start_screen()  # Main menu
 screen.fill(0xff0000)
 cam = Camera(field)
+button_sprites.empty()
 control_panel = ControlPanel(field, cam)
 black_texture = pygame.transform.scale(load_image("black-texture.png"), (WIDTH, HEIGHT))
 up_counter, down_counter, left_counter, right_counter = [None] * 4
 ctrl_pressed = False
 hold_timeout = 5  # задержка после зажатия кнопки
 hold_speed = 30  # задержка между повторениями зажатых кнопок
-button_sprites.empty()
 
 while running:
     for event in pygame.event.get():
