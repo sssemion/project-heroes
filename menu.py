@@ -674,8 +674,8 @@ class Field:  # Игровое поле
                         self.field[x][y] = Cell(content=self.players[YELLOW][0])
                     else:
                         self.field[x][y] = Cell()
-                elif self.field[x][y] == '0':
-                    self.field[x][y] = Cell(content=ITEMS['coins'])
+                elif self.field[x][y] in ITEMS:
+                    self.field[x][y] = Cell(content=ITEMS[self.field[x][y]])
                 elif self.field[x][y] in HOUSES:
                     self.field[x][y] = Cell(building=House(x, y, self.field[x][y] + '.png', *HOUSES[self.field[x][y]]))
                 self.field[x][y].render(x, y)
