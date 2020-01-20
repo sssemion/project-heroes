@@ -369,7 +369,7 @@ ITEMS = {
 
 # Библиотека карт
 MAPS = {
-    'example': Map('example.txt', "Пример", "Просто карта для тестирования"),
+    'example': Map('example.txt', "Карта", "Идеальная карта для начала игры"),
 }
 
 # Библиотека юнитов
@@ -1036,6 +1036,7 @@ class FightBoard:
         self.surface.blit(cells_surface, (FightBoard.margin_right, FightBoard.margin_top))
 
     def draw_units(self):
+        self.draw_cells()
         for row in range(self.rows):
             for col in range(self.cols):
                 if type(self.board[row][col]).__name__ == 'Unit':
@@ -1243,6 +1244,7 @@ def fight(left_hero, right_hero):
                 x -= topleft_coord[0]
                 y -= topleft_coord[1]
                 fight_board.get_click((x, y))
+        # fight_board.draw_cells()
         fight_board.draw_units()
         screen.blit(fight_board.surface, topleft_coord)
         pygame.display.flip()
@@ -1277,7 +1279,7 @@ class Player(pygame.sprite.Sprite):
         self.money = 0
         self.inventory = equipped_items + [self.money]
         self.bonus = {'sale': 1, 'd_hp': 0, 'bonus_move': 0, 'd_spd': 0}
-        self.army = [Player.null_unit.copy() for i in range(7)]
+        self.army = [UNITS['pegas'].copy()] + [Player.null_unit.copy() for i in range(6)]
         self.movepoints = 2000
 
     def move(self, x, y):
@@ -1912,14 +1914,8 @@ def start_screen():
     continue_button.set_text("Продолжить", font, pygame.color.Color(156, 130, 79))
     continue_button.render()
 
-    settings_button = Button(button_sprites, (WIDTH - bwidth) // 2,
-                             (HEIGHT - bheight * -0.5) // 2, bwidth, bheight)
-    settings_button.set_background_image('button-background.jpg')
-    settings_button.set_text("Настройки", font, pygame.color.Color(156, 130, 79))
-    settings_button.render()
-
     exit_button = Button(button_sprites, (WIDTH - bwidth) // 2,
-                         (HEIGHT - bheight * -3.5) // 2, bwidth, bheight, terminate)
+                             (HEIGHT - bheight * -0.5) // 2, bwidth, bheight, terminate)
     exit_button.set_background_image('button-background.jpg')
     exit_button.set_text("Выйти", font, pygame.color.Color(32, 32, 32))
     exit_button.render()
@@ -2085,6 +2081,7 @@ up_counter, down_counter, left_counter, right_counter = [None] * 4
 ctrl_pressed = False
 hold_timeout = 5  # задержка после зажатия кнопки
 hold_speed = 30  # задержка между повторениями зажатых кнопок
+button_sprites.empty()
 
 while running:
     for event in pygame.event.get():
