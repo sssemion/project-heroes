@@ -445,7 +445,7 @@ class Cell:  # Ячейка поля Field
 
 
 class ControlPanel:  # Панель управления в правой части экрана
-    width = 200  # px
+    width = int(WIDTH / 6.4)  # px
     backgroung = pygame.transform.scale(load_image("control-panel-background.jpg"), (width, HEIGHT))
 
     def __init__(self, field, cam):
@@ -455,15 +455,34 @@ class ControlPanel:  # Панель управления в правой час�
         self.surface.blit(self.backgroung, (0, 0))
         self.render_minimap()
 
+        font = pygame.font.Font('data/16478.otf', 24)
+        self.next_player_button = Button(button_sprites, 8, HEIGHT - 108, self.width - 16, 100)
+        self.next_player_button.set_text("Следующий ход", font, pygame.color.Color(156, 130, 79))
+        self.next_player_button.set_background_image("button-background.jpg")
+        self.next_player_button.render()
+
     def draw(self):
+        self.surface.blit(self.backgroung, (0, 0))
+
         map = self.render_minimap()
-        self.surface.blit(map, ((self.width - map.get_width()) // 2, 8))
+        current_player = self.render_current_player_text()
+
+        y_coord = 8
+
+        self.surface.blit(map, ((self.width - map.get_width()) // 2, y_coord))
+        y_coord += map.get_height() + 10
+
+        self.surface.blit(current_player, ((self.width - current_player.get_width()) // 2, y_coord))
+        y_coord += current_player.get_height() + 10
+
+        button_sprites.draw(self.surface)
+
         screen.blit(self.surface, (WIDTH - self.width, 0))
 
     def render_minimap(self):
         width, height = self.field.width, self.field.height
         frame_size = 2
-        cell_size = min((self.width - 16) // width, 250 // height)
+        cell_size = min((self.width - 16) // width, self.width // height)
         w, h = cell_size * width + frame_size * 2, cell_size * height + frame_size * 2
         surface = pygame.Surface((w, h))
         for row in range(height):
@@ -482,6 +501,28 @@ class ControlPanel:  # Панель управления в правой час�
         # рисуем рамочку
         pygame.draw.rect(surface, 0xe7daae, (0, 0, w - 1, h - 1), 2)
         return surface
+
+    def render_current_player_text(self):
+        text = f'Сейчас ходит:\n{self.field.teams[self.field.current_team]}'
+
+        font = pygame.font.Font('data/16478.otf', 24)
+        text_surf = pygame.Surface((self.width, HEIGHT // 5), flags=pygame.SRCALPHA)
+        lines = text.split('\n')
+        coord = 0
+        for i, line in enumerate(lines):
+            rendered = font.render(line, True, pygame.color.Color(156, 130, 79))
+            w, h = rendered.get_size()
+            text_surf.blit(rendered, ((self.width - w) // 2, coord))
+            coord += h + 2
+        return text_surf
+
+    def update(self, event):
+        if event.type == pygame.MOUSEMOTION or event.type == pygame.MOUSEBUTTONDOWN:
+            event.pos = event.pos[0] - WIDTH + self.width, event.pos[1]
+            button_sprites.update(event)
+
+        if self.next_player_button.clicked:
+            self.field.next_player()
 
 
 class Field:  # Игровое поле
@@ -518,6 +559,9 @@ class Field:  # Игровое поле
 
         self.render()
         self.graph()
+
+        self.current_team = GREEN
+        self.days = 0
 
     def possible_turns(self, WantRow, WantColumn):
         if WantRow == self.height - 1 and WantColumn == self.width - 1:
@@ -776,6 +820,7 @@ class Field:  # Игровое поле
                         screen.blit(self.space, (Field.margin_right - cam.get_x_shift(),
                                                  Field.margin_top - cam.get_y_shift()))
                         self.draw_frame()
+                        control_panel.draw()
                         pygame.display.flip()
                         clock.tick(FPS)
                     selected_hero.move(col, row)
@@ -810,6 +855,7 @@ class Field:  # Игровое поле
                     clock.tick(FPS)
 
                 selected_hero.image = selected_hero.default_image
+                selected_hero.render()
 
             else:
                 # Убираем старые стрелочки
@@ -863,11 +909,12 @@ class Field:  # Игровое поле
                     Arrow(direction, row, col)
                 Arrow("goal", *path[-1])
 
-
         elif action == 3:
-            if type(self.field[cell[0]][cell[1]].content).__name__ == 'Player':
+            content = self.field[cell[0]][cell[1]].get_content()
+            if type(content).__name__ == 'Player' and (selected_hero is None and
+                                                       self.current_team == content.team):
                 sel_her_row, sel_her_col = cell[0], cell[1]
-                selected_hero = self.field[cell[0]][cell[1]].content
+                selected_hero = self.field[cell[0]][cell[1]].get_content()
                 last_row, last_col = -1, -1
         # print(sel_her_row, sel_her_col, last_row, last_col)
 
@@ -917,6 +964,12 @@ class Field:  # Игровое поле
         for row in range(height):
             file.write(''.join(new_field[row]) + '\n' * (row != height - 1))
         file.close()
+
+    def next_player(self):
+        self.days += 1
+        self.current_team = list(self.teams.keys())[self.days % self.number_of_players]
+        global selected_hero
+        selected_hero = None
 
 
 class FightBoard:
@@ -1981,6 +2034,9 @@ while running:
                     cam.right()
                 else:
                     cam.lower()
+            control_panel.update(event)
+        elif event.type == pygame.MOUSEMOTION:
+            control_panel.update(event)
 
     # Увеличиваем счетчик зажатых клавиш (если они зажаты)
     if up_counter is not None:
