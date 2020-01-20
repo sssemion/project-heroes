@@ -859,7 +859,7 @@ class Field:  # Игровое поле
                         money = content.money
                         new_field[x] += f'{{{inventory}&{bonus}&{army}&{mp}&{money}}}'
                     elif type(content).__name__ == 'Item':
-                        new_field[x] += '0'  # TODO: сохранение Item-ов
+                        new_field[x] += content.tile_type
                     elif type(content).__name__ == 'NPC':
                         pass
                 new_field[x] += ';'
