@@ -122,6 +122,8 @@ class Unit(pygame.sprite.Sprite):
         self.cur_atc, self.cur_dfc, self.cur_spd, self.cur_hp, self.cur_top_hp = \
             attack, defence, speed, hp, hp
         self.rect = pygame.Rect(0, 0, 0, 0)
+        self.fight_row, self.fight_col = None, None
+        self.fight_side = None
 
     def attack_rat(self, enemy):
         damage = random.randint(self.min_dmg, self.max_dmg) * (self.cur_atc / enemy.cur_dfc) * (
@@ -184,7 +186,8 @@ class Unit(pygame.sprite.Sprite):
                 raise Exception(f'incorrect updating_type: {updating_type}')
 
     def copy(self):
-        return Unit(self.image_filename, self.name, self.atc, self.dfc, self.min_dmg, self.max_dmg, self.count, self.spd, self.hp)
+        return Unit(self.image_filename, self.name, self.atc, self.dfc, self.min_dmg, self.max_dmg, self.count,
+                    self.spd, self.hp)
 
     def __lt__(self, other):
         if self.spd < other.spd:
@@ -208,6 +211,15 @@ class Unit(pygame.sprite.Sprite):
 
     def __add__(self, other):
         self.count += other.count
+
+    def __eq__(self, other):
+        return super().__eq__(other) and self.name == other.name
+
+    def __ne__(self, other):
+        return super().__ne__(other) and self.name != other.name
+
+    def __hash__(self):
+        return hash(id(self))
 
 
 class Tile(pygame.sprite.Sprite):
@@ -977,18 +989,26 @@ class FightBoard:
     margin_right = margin_left = 50
     margin_bottom = 25
 
-    def __init__(self, board, width, height):
+    def __init__(self, board, width, height, left, right):
+        self.alive_left, self.alive_right = left, right
         self.board = board
+        self.queue = left + right
+        self.queue.sort()
+        self.chosen_unit = self.queue.pop(0)
+        self.copy_board = [[(i.copy() if type(i).__name__ == 'Unit' else i) for i in j] for j in self.board]
+        print(id(self.copy_board[0][0]) == id(self.board[0][0]))
+        self.vars = self.voln(self.chosen_unit.fight_row, self.chosen_unit.fight_col, self.chosen_unit.spd,
+                              self.copy_board)
         self.width = width
         self.height = height
         self.rows = self.cols = 0
         self.cell_width = self.cell_height = 0
         self.surface = pygame.Surface((width, height))
-        self.surface.blit(
-            pygame.transform.scale(load_image('fight-background.jpg'), (width, height)), (0, 0))
         self.active_units = pygame.sprite.Group()
 
     def draw_cells(self):
+        self.surface.blit(
+            pygame.transform.scale(load_image('fight-background.jpg'), (self.width, self.height)), (0, 0))
         self.rows = len(self.board)
         self.cols = len(self.board[0])
         self.cell_width = (self.width - FightBoard.margin_left - FightBoard.margin_right) // self.cols
@@ -1007,39 +1027,116 @@ class FightBoard:
                               self.height - FightBoard.margin_top - FightBoard.margin_bottom), 2)
         cells_surface.set_colorkey(0x000000)
         cells_surface.set_alpha(128)
-
         for row in range(self.rows):
             for col in range(self.cols):
-                if self.board[row][col] is not None:
+                if type(self.board[row][col]).__name__ == 'Unit':
                     self.active_units.add(self.board[row][col])
                     self.board[row][col].resize(self.cell_width, self.cell_height)
-
 
         self.surface.blit(cells_surface, (FightBoard.margin_right, FightBoard.margin_top))
 
     def draw_units(self):
         for row in range(self.rows):
             for col in range(self.cols):
-                if self.board[row][col] is not None:
+                if type(self.board[row][col]).__name__ == 'Unit':
                     self.board[row][col].move(self.margin_left + col * self.cell_width,
-                                                              self.margin_top + row * self.cell_height)
+                                              self.margin_top + row * self.cell_height)
         self.active_units.draw(self.surface)
 
     def get_click(self, mouse_pos):
         cell = self.get_cell(mouse_pos)
-        self.on_click(cell)
+        return self.on_click(cell)
 
     def get_cell(self, mouse_pos):
         if not (FightBoard.margin_left <= mouse_pos[
             0] <= FightBoard.margin_left + self.width * self.cell_width) or not (
-                FightBoard.margin_top <= mouse_pos[
-            1] <= FightBoard.margin_top + self.height * self.cell_height):
+                FightBoard.margin_top <= mouse_pos[1] <= FightBoard.margin_top + self.height * self.cell_height):
             return None
         return (mouse_pos[1] - FightBoard.margin_top) // self.cell_height, (
                 mouse_pos[0] - FightBoard.margin_left) // self.cell_width
 
     def on_click(self, cell):
-        pass
+        if self.vars[cell[0]][cell[1]]:
+            self.board[self.chosen_unit.fight_row][self.chosen_unit.fight_col], self.board[cell[0]][
+                cell[1]] = None, self.chosen_unit
+            self.board[cell[0]][cell[1]].fight_row, self.board[cell[0]][cell[1]].fight_col = cell[0], cell[1]
+            beat = False
+            death = 0
+            for turn in self.possible_turns(cell[0], cell[1]):
+                if type(self.board[cell[0] + turn[0]][cell[1] + turn[1]]).__name__ == 'Unit' and not beat:
+                    if self.board[cell[0]][cell[1]].fight_side != self.board[cell[0] + \
+                                                                             turn[0]][cell[1] + turn[1]].fight_side:
+                        self.board[cell[0]][cell[1]].attack_hon(self.board[cell[0] + turn[0]][cell[1] + turn[1]])
+                        beat = True
+                        if self.chosen_unit.dead:
+                            self.board[self.chosen_unit.fight_row][self.chosen_unit.fight_col] = None
+                            if self.chosen_unit.fight_side == 'left':
+                                self.alive_left.pop(
+                                    [unit.name for unit in self.alive_left].index(self.chosen_unit.name))
+                            elif self.chosen_unit.fight_side == 'right':
+                                self.alive_right.pop(
+                                    [unit.name for unit in self.alive_right].index(self.chosen_unit.name))
+                            death = self.chosen_unit
+                        elif self.board[cell[0]][cell[1]].dead:
+                            self.board[self.self.board[cell[0]][cell[1]].fight_row][
+                                self.self.board[cell[0]][cell[1]].fight_col] = None
+                            if self.board[cell[0]][cell[1]].fight_side == 'left':
+                                self.alive_left.pop(
+                                    [unit.name for unit in self.alive_left].index(self.board[cell[0]][cell[1]].name))
+                            elif self.chosen_unit.fight_side == 'right':
+                                self.alive_right.pop(
+                                    [unit.name for unit in self.alive_right].index(self.board[cell[0]][cell[1]].name))
+                            death = self.board[cell[0]][cell[1]]
+            self.draw_cells()
+            if death:
+                self.queue = self.alive_left + self.alive_right
+                self.queue.sort()
+            else:
+                self.queue = self.queue + [self.chosen_unit]
+            if not self.alive_left:
+                return 'right', self.alive_right
+            if not self.alive_right:
+                return 'left', self.alive_left
+            self.chosen_unit = self.queue.pop(0)
+            self.copy_board = [[(i.copy() if type(i).__name__ == 'Unit' else i) for i in j] for j in self.board]
+            self.vars = self.voln(self.chosen_unit.fight_row, self.chosen_unit.fight_col, self.chosen_unit.spd,
+                                  self.copy_board)
+
+    def possible_turns(self, WantRow, WantColumn):
+        if WantRow == 9 - 1 and WantColumn == 10 - 1:
+            return [[0, -1], [-1, -1], [-1, 0]]
+
+        if 9 - 1 > WantRow > 0 and 10 - 1 > WantColumn > 0:
+            return [[0, 1], [1, 1], [1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1]]
+
+        if 9 - 1 > WantRow > 0 and WantColumn == 0:
+            return [[-1, 0], [-1, 1], [0, 1], [1, 1], [1, 0]]
+
+        if 0 < WantRow < 9 - 1 and WantColumn == 10 - 1:
+            return [[-1, 0], [-1, -1], [0, -1], [1, -1], [1, 0]]
+
+        if 10 - 1 > WantColumn > 0 and WantRow == 0:
+            return [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1]]
+
+        if 0 < WantColumn < 10 - 1 and 9 - 1 == WantRow:
+            return [[0, -1], [-1, -1], [-1, 0], [-1, 1], [0, 1]]
+
+        if WantRow == 0 and WantColumn == 0:
+            return [[0, 1], [1, 1], [1, 0]]
+
+        if WantRow == 0 and WantColumn == 10 - 1:
+            return [[0, -1], [1, -1], [1, 0]]
+
+        if WantRow == 9 - 1 and WantColumn == 0:
+            return [[-1, 0], [-1, 1], [0, 1]]
+
+    def voln(self, row, col, step, table):
+        table[row][col] = True
+        if step != 1:
+            for turn in self.possible_turns(row, col):
+                if table[row + turn[0]][col + turn[1]] is None:
+                    self.voln(row + turn[0], col + turn[1], step - 1, table)
+        return table
 
 
 class HeroFightScreen:
@@ -1087,18 +1184,22 @@ def fight(left_hero, right_hero):
     null_unit = Unit("player.png", "", 0, 0, 0, 0, 0, 0, 0)
     board = [[None] * 10 for _ in range(9)]
     turn_queue = left_hero.army + right_hero.army
-
+    send_left, send_right = [], []
 
     for num in range(len(left_hero.army)):
         if left_hero.army[num] != null_unit:
             board[coor_row[num]][0] = left_hero.army[num]
-
+            left_hero.army[num].fight_row, left_hero.army[num].fight_col = coor_row[num], 0
+            send_left.append(left_hero.army[num])
+            left_hero.army[num].fight_side = 'left'
 
     for num in range(len(right_hero.army)):
         if right_hero.army[num] != null_unit:
             board[coor_row[num]][9] = right_hero.army[num]
             board[coor_row[num]][9].reverse()
-
+            right_hero.army[num].fight_row, right_hero.army[num].fight_col = coor_row[num], 9
+            send_right.append(right_hero.army[num])
+            right_hero.army[num].fight_side = 'right'
 
     # Сохраняем основной экран и затемняем его
     screen_save = screen.copy()
@@ -1110,7 +1211,7 @@ def fight(left_hero, right_hero):
     # Создаем экран боя
     width, height = 800, 556
     topleft_coord = ((WIDTH - width) // 2, (HEIGHT - height) // 2)
-    fight_board = FightBoard(board, width, height)
+    fight_board = FightBoard(board, width, height, send_left, send_right)
 
     # Чертим клеточки
     fight_board.draw_cells()
@@ -1176,7 +1277,7 @@ class Player(pygame.sprite.Sprite):
         self.money = 0
         self.inventory = equipped_items + [self.money]
         self.bonus = {'sale': 1, 'd_hp': 0, 'bonus_move': 0, 'd_spd': 0}
-        self.army = [Player.null_unit] * 7
+        self.army = [Player.null_unit.copy() for i in range(7)]
         self.movepoints = 2000
 
     def move(self, x, y):
@@ -1319,12 +1420,13 @@ class House(pygame.sprite.Sprite):
                     attempt = True
                     current_text = reject
                     if self.cost // visitor.bonus['sale'] <= visitor.money and not self.bought:
-                        if Player.null_unit in visitor.army:
-                            visitor.army[visitor.army.index(Player.null_unit)] = self.unit
+                        if Player.null_unit.name in [unit.name for unit in visitor.army]:
+                            visitor.army[[unit.name for unit in visitor.army].index(Player.null_unit.name)] = self.unit
                             visitor.money -= self.cost // visitor.bonus['sale']
                             current_text = congratulation
                             self.bought = True
-                        elif self.unit.name in [unit.name for unit in visitor.army] and not self.bought:
+                        elif self.unit.name in [unit.name for unit in visitor.army] and not self.bought and self.cost // \
+                                visitor.bonus['sale'] <= visitor.money:
                             visitor.army[[unit.name for unit in visitor.army].index(self.unit.name)] = \
                                 visitor.army[[unit.name for unit in visitor.army].index(self.unit.name)] + self.unit
                             visitor.money -= self.cost // visitor.bonus['sale']
