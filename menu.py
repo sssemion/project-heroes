@@ -559,6 +559,9 @@ class Field:  # Игровое поле
         self.game_name, self.map_name, self.names, *self.field = file.read().split('\n')
         file.close()
 
+        self.game_name, self.days = self.game_name.split(';')
+        self.days = int(self.days)
+
         self.field = [list(map(str.strip, line.split(';'))) for line in self.field]
 
         self.width = len(self.field[0])
@@ -572,11 +575,9 @@ class Field:  # Игровое поле
         for i in range(self.number_of_players):
             self.teams[colors[i]] = self.names[i]
 
+        self.current_team = list(self.teams.keys())[self.days % self.number_of_players]
         self.render()
         self.graph()
-
-        self.current_team = GREEN
-        self.days = 0
 
     def possible_turns(self, WantRow, WantColumn):
         if WantRow == self.height - 1 and WantColumn == self.width - 1:
@@ -881,7 +882,7 @@ class Field:  # Игровое поле
                     pygame.display.flip()
                     clock.tick(FPS)
 
-                selected_hero.image = selected_hero.default_image
+                selected_hero.image = selected_hero.default_image.copy()
                 selected_hero.render()
 
             else:
@@ -984,7 +985,7 @@ class Field:  # Игровое поле
             new_field[x] = new_field[x][:-1]
 
         file = open(os.path.join("data/saves", f"{self.save_slot}.txt"), 'w', encoding='utf-8')
-        file.write(self.game_name + '\n')
+        file.write(self.game_name + ';' + self.days, '\n')
         file.write(self.map_name + '\n')
         file.write(';'.join(self.names) + '\n')
         height = len(new_field)
@@ -993,9 +994,25 @@ class Field:  # Игровое поле
         file.close()
 
     def next_player(self):
-        self.days += 1
-        self.current_team = list(self.teams.keys())[self.days % self.number_of_players]
         global selected_hero
+        cur_player = self.players[self.current_team][0]
+        if cur_player.movepoints != 0:
+            yes = dialog(
+                f"У вашего героя осталось\n{cur_player.movepoints} очков передвижения\nВы уверены, что хотите\nзавершить ход?")
+            if yes:
+                self.days += 1
+                self.current_team = list(self.teams.keys())[self.days % self.number_of_players]
+            else:
+                return
+        else:
+            self.days += 1
+            self.current_team = list(self.teams.keys())[self.days % self.number_of_players]
+        cur_player.movepoints = Player.default_movepoints
+
+        while not self.players[
+            self.current_team]:  # Если игрока убили, нужно передать ход следующему
+            self.days += 1
+            self.current_team = list(self.teams.keys())[self.days % self.number_of_players]
         selected_hero = None
 
 
@@ -1291,6 +1308,7 @@ class Player(pygame.sprite.Sprite):
         [pygame.transform.scale(load_image(f'heroes/default/{i}.png'), (tile_width, tile_height)) for
          i in range(len([name for name in os.listdir('data/images/heroes/default')]) - 1)])
     animation_counter = 0
+    default_movepoints = 2000
 
     def __init__(self, pos_y, pos_x, team):
         super().__init__(player_sprites)
@@ -1313,7 +1331,7 @@ class Player(pygame.sprite.Sprite):
         self.inventory = equipped_items + [self.money]
         self.bonus = {'sale': 1, 'd_hp': 0, 'bonus_move': 0, 'd_spd': 0}
         self.army = [UNITS['pegas'].copy()] + [Player.null_unit.copy() for i in range(6)]
-        self.movepoints = 2000
+        self.movepoints = Player.default_movepoints
 
     def move(self, x, y):
         self.pos = x, y
@@ -1334,6 +1352,8 @@ class Player(pygame.sprite.Sprite):
                             other.army.append(res[1][i])
                         else:
                             other.army.append(Player.null_unit)
+                    field.players[other.team] = []
+                    other.kill()
                     field.field[self.pos[1]][self.pos[0]].render(self.pos[0], self.pos[1])
                 elif res[0] == 'right':
                     field.field[self.pos[1]][self.pos[0]].content = self
@@ -1343,6 +1363,8 @@ class Player(pygame.sprite.Sprite):
                             other.army.append(res[1][i])
                         else:
                             other.army.append(Player.null_unit)
+                    field.players[self.team] = []
+                    self.kill()
                     field.field[self.pos[1]][self.pos[0]].render(self.pos[0], self.pos[1])
         elif type(other).__name__ == 'Item':
             # Обычные предметы меняются на лучшие версии себя
@@ -1835,9 +1857,10 @@ def select_save_slot(mode):  # mode = "create" or "load"
         data = f.read()
         f.close()
         game_name, map_name, names, *field = data.split('\n')
+        game_name, days = game_name.split(';')
         nplayers = len(names.split(';'))
         num = int(filename[:-4])
-        slots[num - 1] = game_name, map_name, nplayers
+        slots[num - 1] = game_name, days, map_name, nplayers
 
     bwidth = width // 2.5
     bheight = (height - 150) // 7
@@ -1852,8 +1875,10 @@ def select_save_slot(mode):  # mode = "create" or "load"
         slot.set_background_color(pygame.color.Color(138, 15, 18, 200))
 
         if slots[i] is not None:
-            slot.set_text(f"{slots[i][0]}\nКарта: {slots[i][1]}        Игроков: {slots[i][2]}", font,
-                          pygame.color.Color(156, 130, 79))
+            slot.set_text(
+                f"{slots[i][0]}\nКарта: {slots[i][2]} | Игроков: {slots[i][3]}\nДней: {int(slots[i][1]) // int(slots[i][3])}",
+                font,
+                pygame.color.Color(156, 130, 79))
         else:
             slot.set_text("Пустой слот", font, pygame.color.Color(156, 130, 79))
         slot.render()
@@ -2098,7 +2123,7 @@ def new_game():
                     save_slot = select_save_slot("create")  # Слот для сохранения
                     file = open(os.path.join("data/saves", f"{save_slot}.txt"), 'w',
                                 encoding='utf-8')
-                    file.write(name_input.text + '\n')
+                    file.write(name_input.text + ';0\n')
                     file.write(map_name + '\n')
                     file.write(';'.join(filter(lambda x: x, (
                         g_input.text, r_input.text, b_input.text, y_input.text))) + '\n')
