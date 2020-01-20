@@ -880,7 +880,7 @@ class FightBoard:
     margin_right = margin_left = 50
     margin_bottom = 25
 
-    def __init__(self, board, width, height):
+    def __init__(self, board, width, height, left, right):
         self.board = board
         self.width = width
         self.height = height
@@ -919,14 +919,49 @@ class FightBoard:
     def get_cell(self, mouse_pos):
         if not (FightBoard.margin_left <= mouse_pos[
             0] <= FightBoard.margin_left + self.width * self.cell_width) or not (
-                FightBoard.margin_top <= mouse_pos[
-            1] <= FightBoard.margin_top + self.height * self.cell_height):
+                FightBoard.margin_top <= mouse_pos[1] <= FightBoard.margin_top + self.height * self.cell_height):
             return None
         return (mouse_pos[1] - FightBoard.margin_top) // self.cell_height, (
                 mouse_pos[0] - FightBoard.margin_left) // self.cell_width
 
     def on_click(self, cell):
         pass
+
+    def possible_turns(self, WantRow, WantColumn):
+        if WantRow == 9 - 1 and WantColumn == 10 - 1:
+            return [[0, -1], [-1, -1], [-1, 0]]
+
+        if 9 - 1 > WantRow > 0 and 10 - 1 > WantColumn > 0:
+            return [[0, 1], [1, 1], [1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1]]
+
+        if 9 - 1 > WantRow > 0 and WantColumn == 0:
+            return [[-1, 0], [-1, 1], [0, 1], [1, 1], [1, 0]]
+
+        if 0 < WantRow < 9 - 1 and WantColumn == 10 - 1:
+            return [[-1, 0], [-1, -1], [0, -1], [1, -1], [1, 0]]
+
+        if 10 - 1 > WantColumn > 0 and WantRow == 0:
+            return [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1]]
+
+        if 0 < WantColumn < 10 - 1 and 9 - 1 == WantRow:
+            return [[0, -1], [-1, -1], [-1, 0], [-1, 1], [0, 1]]
+
+        if WantRow == 0 and WantColumn == 0:
+            return [[0, 1], [1, 1], [1, 0]]
+
+        if WantRow == 0 and WantColumn == 10 - 1:
+            return [[0, -1], [1, -1], [1, 0]]
+
+        if WantRow == 9 - 1 and WantColumn == 0:
+            return [[-1, 0], [-1, 1], [0, 1]]
+
+    def voln(self, row, col, step, table):
+        table[row][col] = step
+        if step != 1:
+            for turn in self.possible_turns(row, col):
+                if table[row + turn[0]][col + turn[1]] == 0:
+                    self.voln(row + turn[0], col + turn[1], step - 1, table)
+        return table
 
 
 class HeroFightScreen:
@@ -993,7 +1028,7 @@ def fight(left_hero, right_hero):
     # Создаем экран боя
     width, height = 800, 556
     topleft_coord = ((WIDTH - width) // 2, (HEIGHT - height) // 2)
-    fight_board = FightBoard(board, width, height)
+    fight_board = FightBoard(board, width, height, left_hero.army, right_hero.army)
 
     # Чертим клеточки
     fight_board.draw_cells()
