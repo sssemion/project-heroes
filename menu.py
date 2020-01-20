@@ -171,11 +171,8 @@ class Unit(pygame.sprite.Sprite):
         if self.count < 0:
             self.dead = 1
 
-    def hero_bonus(self, hero):
-        d_atc, d_dfc, d_features = hero.atc, hero.dfc, hero.bonus
-        self.cur_atc, self.cur_dfc, self.hp, self.cur_spd, self.cur_top_hp = \
-            self.cur_atc + d_atc, self.cur_dfc + d_dfc, self.hp + d_features['d_hp'], \
-            self.cur_spd + d_features['d_spd'], self.cur_top_hp + d_features['d_hp']
+    def hero_bonus(self, D_atc, D_dfc):
+        self.cur_atc, self.cur_dfc = self.cur_atc + D_atc, self.cur_dfc + D_dfc
 
     def update(self, updating_type='', *args):
         if updating_type:
@@ -1017,7 +1014,7 @@ class Field:  # Игровое поле
         else:
             self.days += 1
             self.current_team = list(self.teams.keys())[self.days % self.number_of_players]
-        cur_player.movepoints = Player.default_movepoints
+        cur_player.movepoints = Player.default_movepoints + cur_player.bonus['bonus_move']
 
         while not self.players[
             self.current_team]:  # Если игрока убили, нужно передать ход следующему
@@ -1107,8 +1104,7 @@ class FightBoard:
         if self.vars[cell[0]][cell[1]]:
             self.board[self.chosen_unit.fight_row][self.chosen_unit.fight_col], self.board[cell[0]][
                 cell[1]] = None, self.chosen_unit
-            self.board[cell[0]][cell[1]].fight_row, self.board[cell[0]][cell[1]].fight_col = cell[0], \
-                                                                                             cell[1]
+            self.board[cell[0]][cell[1]].fight_row, self.board[cell[0]][cell[1]].fight_col = cell[0], cell[1]
             beat = False
             death = 0
             for turn in self.possible_turns(cell[0], cell[1]):
@@ -1131,6 +1127,7 @@ class FightBoard:
                                     [unit.name for unit in self.alive_right].index(
                                         self.chosen_unit.name))
                             death = self.chosen_unit
+                            death.kill()
                         elif self.board[cell[0]][cell[1]].dead:
                             self.board[self.self.board[cell[0]][cell[1]].fight_row][
                                 self.self.board[cell[0]][cell[1]].fight_col] = None
@@ -1143,6 +1140,7 @@ class FightBoard:
                                     [unit.name for unit in self.alive_right].index(
                                         self.board[cell[0]][cell[1]].name))
                             death = self.board[cell[0]][cell[1]]
+                            death.kill()
             self.draw_cells()
             if death:
                 self.queue = self.alive_left + self.alive_right
@@ -1343,6 +1341,10 @@ class Player(pygame.sprite.Sprite):
         self.army = [UNITS['pegas'].copy()] + [Player.null_unit.copy() for i in range(6)]
         self.movepoints = Player.default_movepoints
 
+    def bonus_units(self):
+        for unit in self.army:
+            unit.hero_bonus(self, self.atc, self.dfc)
+
     def move(self, x, y):
         self.pos = x, y
         self.rect = self.image.get_rect().move(tile_width * x, tile_height * y)
@@ -1354,7 +1356,7 @@ class Player(pygame.sprite.Sprite):
         if type(other).__name__ == 'Player':
             if other.team != self.team:
                 res = fight(self, other)
-                if res[0] == 'left':
+                if res is not None and res[0] == 'left':
                     field.field[self.pos[1]][self.pos[0]].content = other
                     other.army = []
                     for i in range(7):
@@ -1365,7 +1367,7 @@ class Player(pygame.sprite.Sprite):
                     field.players[other.team] = []
                     other.kill()
                     field.field[self.pos[1]][self.pos[0]].render(self.pos[0], self.pos[1])
-                elif res[0] == 'right':
+                elif res is not None and res[0] == 'right':
                     field.field[self.pos[1]][self.pos[0]].content = self
                     self.army = []
                     for i in range(7):
@@ -1400,7 +1402,7 @@ class Player(pygame.sprite.Sprite):
                 self.atc, self.dfc = self.atc + self.equipped_shield.d_atc, self.dfc + self.equipped_shield.d_dfc
             # НЕОбычные предметы меняются на лучшие версии себя
             elif other.slot == 'other':
-                key, val = other.feature.keys()[0], other.feature.values()[0]
+                key, val = list(other.feature.keys())[0], list(other.feature.values())[0]
                 self.bonus[key] = self.bonus[key] + val
             elif other.slot == 'coins':
                 self.money += 1
@@ -1899,9 +1901,8 @@ def select_save_slot(mode):  # mode = "create" or "load"
 
         if slots[i] is not None:
             slot.set_text(
-                f"{slots[i][0]}\nКарта: {slots[i][2]} | Игроков: {slots[i][3]}\nДней: {int(slots[i][1]) // int(slots[i][3])}",
-                font,
-                pygame.color.Color(156, 130, 79))
+                f"{slots[i][0]}\nКарта: {slots[i][2]} | Игроков: {slots[i][3]}\nДней:"
+                f" {int(slots[i][1]) // int(slots[i][3])}", font, pygame.color.Color(156, 130, 79))
         else:
             slot.set_text("Пустой слот", font, pygame.color.Color(156, 130, 79))
         slot.render()
