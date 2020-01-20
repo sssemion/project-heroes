@@ -326,7 +326,7 @@ ITEMS = {
     'costring': Item('Лента дипломата', 0, 0, "Кольцо дипломата. Все идут за вами", 'other',
                      'costring', {'sale': 1}),
     'null': Item('', 0, 0, '', "all", "null"),
-    'coins': Item('coins', 0, 0, 'coins', 0),
+    'coins': Item('coins', 0, 0, '', 'coins'),
 }
 
 # Библиотека карт
@@ -358,7 +358,7 @@ HOUSES = {
     'hangel': (UNITS['angel'], 5, 1),
     'hcyclope': (UNITS['cyclope'], 5, 1),
     'hearth': (UNITS['earth'], 3, 4),
-    'hfire': (UNITS['fire'], 5, 8),
+    'hfire': (UNITS['fire'], 5, 1),
     'hgnom': (UNITS['gnom'], 1, 8),
     'hgoblin': (UNITS['goblin'], 1, 8),
     'hhorn': (UNITS['horn'], 5, 1),
@@ -585,7 +585,8 @@ class Field:  # Игровое поле
                         self.players[GREEN][0].equipped_chest = chest
                         self.players[GREEN][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1], 'bonus_move': bonus[2],
                                                         'd_spd': bonus[3]}
-                        self.players[GREEN][0].army = [(UNITS[unit].copy() if unit else 'null') for unit in army.split(',')]
+                        self.players[GREEN][0].army = [(UNITS[unit].copy() if unit else 'null') for unit in
+                                                       army.split(',')]
                         self.players[GREEN][0].movepoints = int(movepoints)
                         self.players[GREEN][0].money = int(money)
                     self.field[x][y] = Cell(content=self.players[GREEN][0])
@@ -594,7 +595,7 @@ class Field:  # Игровое поле
                     if self.number_of_players >= 2:
                         self.players[RED] = [Player(x, y, RED)]
                         if (x, y) in data:
-                            weapon, shield, helmet, boots, chest, bonus, army, movepoints, money =\
+                            weapon, shield, helmet, boots, chest, bonus, army, movepoints, money = \
                                 data[(x, y)].split('&')
                             atc = sum(map(lambda x: ITEMS[x].d_atc,
                                           (weapon, shield, helmet, boots, chest)))
@@ -608,8 +609,10 @@ class Field:  # Игровое поле
                             self.players[RED][0].equipped_helmet = helmet
                             self.players[RED][0].equipped_boots = boots
                             self.players[RED][0].equipped_chest = chest
-                            self.players[RED][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1], 'bonus_move': bonus[2], 'd_spd': bonus[3]}
-                            self.players[RED][0].army = [(UNITS[unit].copy() if unit else 'null') for unit in army.split(',')]
+                            self.players[RED][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1], 'bonus_move': bonus[2],
+                                                          'd_spd': bonus[3]}
+                            self.players[RED][0].army = [(UNITS[unit].copy() if unit else 'null') for unit in
+                                                         army.split(',')]
                             self.players[RED][0].movepoints = int(movepoints)
                             self.players[RED][0].money = int(money)
                         self.field[x][y] = Cell(content=self.players[RED][0])
@@ -634,8 +637,10 @@ class Field:  # Игровое поле
                             self.players[BLUE][0].equipped_helmet = helmet
                             self.players[BLUE][0].equipped_boots = boots
                             self.players[BLUE][0].equipped_chest = chest
-                            self.players[BLUE][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1], 'bonus_move': bonus[2], 'd_spd': bonus[3]}
-                            self.players[BLUE][0].army = [(UNITS[unit].copy() if unit else 'null') for unit in army.split(',')]
+                            self.players[BLUE][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1], 'bonus_move': bonus[2],
+                                                           'd_spd': bonus[3]}
+                            self.players[BLUE][0].army = [(UNITS[unit].copy() if unit else 'null') for unit in
+                                                          army.split(',')]
                             self.players[BLUE][0].movepoints = int(movepoints)
                             self.players[BLUE][0].money = int(money)
                         self.field[x][y] = Cell(content=self.players[BLUE][0])
@@ -660,15 +665,17 @@ class Field:  # Игровое поле
                             self.players[YELLOW][0].equipped_helmet = helmet
                             self.players[YELLOW][0].equipped_boots = boots
                             self.players[YELLOW][0].equipped_chest = chest
-                            self.players[YELLOW][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1], 'bonus_move': bonus[2], 'd_spd': bonus[3]}
-                            self.players[YELLOW][0].army = [(UNITS[unit].copy() if unit else 'null') for unit in army.split(',')]
+                            self.players[YELLOW][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1], 'bonus_move': bonus[2],
+                                                             'd_spd': bonus[3]}
+                            self.players[YELLOW][0].army = [(UNITS[unit].copy() if unit else 'null') for unit in
+                                                            army.split(',')]
                             self.players[YELLOW][0].movepoints = int(movepoints)
                             self.players[YELLOW][0].money = int(money)
                         self.field[x][y] = Cell(content=self.players[YELLOW][0])
                     else:
                         self.field[x][y] = Cell()
                 elif self.field[x][y] == '0':
-                    self.field[x][y] = Cell(content=ITEMS['club'])
+                    self.field[x][y] = Cell(content=ITEMS['coins'])
                 elif self.field[x][y] in HOUSES:
                     self.field[x][y] = Cell(building=House(x, y, self.field[x][y] + '.png', *HOUSES[self.field[x][y]]))
                 self.field[x][y].render(x, y)
@@ -697,7 +704,8 @@ class Field:  # Игровое поле
         if action == 1 and selected_hero is not None:
             if selected_hero.get_pos() == cell[::-1]:
                 return
-            if (last_row, last_col) == cell:
+            if (last_row, last_col) == cell and len(path) * 100 <= selected_hero.movepoints:
+                selected_hero.movepoints -= len(path) * 100
                 # Убираем стрелочки
                 arrow_sprites.empty()
 
@@ -1045,7 +1053,7 @@ class Player(pygame.sprite.Sprite):
         self.equipped_boots = Player.null_item
         self.equipped_chest = Player.null_item
         equipped_items = [self.equipped_weapon, self.equipped_shield, self.equipped_helmet, self.equipped_boots,
-                               self.equipped_chest]
+                          self.equipped_chest]
         self.money = 0
         self.inventory = equipped_items + [self.money]
         self.bonus = {'sale': 1, 'd_hp': 0, 'bonus_move': 0, 'd_spd': 0}
@@ -1196,7 +1204,7 @@ class House(pygame.sprite.Sprite):
                             visitor.money -= self.cost // visitor.bonus['sale']
                             current_text = congratulation
                             self.bought = True
-                        elif self.unit.name in [unit.name for unit in visitor.army] and  not self.bought:
+                        elif self.unit.name in [unit.name for unit in visitor.army] and not self.bought:
                             visitor.army[[unit.name for unit in visitor.army].index(self.unit.name)] = \
                                 visitor.army[[unit.name for unit in visitor.army].index(self.unit.name)] + self.unit
                             visitor.money -= self.cost // visitor.bonus['sale']
