@@ -259,7 +259,7 @@ class Map:
             level_map = [list(map(str.strip, line.split(';'))) for line in mapFile]
         max_width = max(map(len, level_map))
         # дополняем каждую строку пустыми клетками ('.')
-        return list(map(lambda x: x + ['.'] * (max_width - len(x)), level_map))
+        return list(map(lambda x: x + ['./'] * (max_width - len(x)), level_map))
 
     def get_name(self):
         return self.name
@@ -275,17 +275,23 @@ class Map:
             self.preview = pygame.Surface((w * tile_width, h * tile_height))
             for x in range(h):
                 for y in range(w):
+                    content, building = field[x][y].split('/')
                     self.preview.blit(pygame.transform.scale(Tile.tile_images["grass"],
                                                              (tile_width, tile_height)),
                                       (y * tile_width, x * tile_height))
-                    if field[x][y] == '#':
+                    if content == '#':
                         self.preview.blit(pygame.transform.scale(Tile.tile_images["rock"],
                                                                  (tile_width, tile_height)),
                                           (y * tile_width, x * tile_height))
-                    elif field[x][y] == '0':
-                        self.preview.blit(pygame.transform.scale(Tile.tile_images["coins"],
+                    elif content in ITEMS:
+                        self.preview.blit(pygame.transform.scale(Tile.tile_images[ITEMS[content].tile_type],
                                                                  (tile_width, tile_height)),
                                           (y * tile_width, x * tile_height))
+                    elif building in HOUSES:
+                        self.preview.blit(pygame.transform.scale(load_image(os.path.join("homes", building + '.png')),
+                                                                 (tile_width, tile_height)),
+                                          (y * tile_width, x * tile_height))
+
             if w * tile_width / width > h * tile_height / height:
                 self.preview = pygame.transform.scale(self.preview, (width, int(h * tile_height *
                                                                                 (width / (
@@ -374,18 +380,18 @@ UNITS = {
 }
 
 HOUSES = {
-    'hair': (UNITS['air'], 1, 8),
-    'hangel': (UNITS['angel'], 5, 1),
-    'hcyclope': (UNITS['cyclope'], 5, 1),
-    'hearth': (UNITS['earth'], 3, 4),
-    'hfire': (UNITS['fire'], 5, 1),
-    'hgnom': (UNITS['gnom'], 1, 8),
-    'hgoblin': (UNITS['goblin'], 1, 8),
-    'hhorn': (UNITS['horn'], 5, 1),
-    'hogre': (UNITS['ogre'], 3, 4),
-    'hpegas': (UNITS['pegas'], 3, 4),
-    'hpikeman': (UNITS['pikeman'], 1, 6),
-    'hswordsman': (UNITS['swordsman'], 3, 4),
+    'hair': (UNITS['air'], 1, 8, 'hair'),
+    'hangel': (UNITS['angel'], 5, 1, 'hangel'),
+    'hcyclope': (UNITS['cyclope'], 5, 1, 'hcyclope'),
+    'hearth': (UNITS['earth'], 3, 4, 'hearth'),
+    'hfire': (UNITS['fire'], 5, 1, 'hfire'),
+    'hgnom': (UNITS['gnom'], 1, 8, 'hgnom'),
+    'hgoblin': (UNITS['goblin'], 1, 8, 'hgoblin'),
+    'hhorn': (UNITS['horn'], 5, 1, 'hhorn'),
+    'hogre': (UNITS['ogre'], 3, 4, 'hogre'),
+    'hpegas': (UNITS['pegas'], 3, 4, 'hpegas'),
+    'hpikeman': (UNITS['pikeman'], 1, 6, 'hpikeman'),
+    'hswordsman': (UNITS['swordsman'], 3, 4, 'hswordsman'),
 }
 
 
@@ -558,6 +564,7 @@ class Field:  # Игровое поле
     def render(self):
         # Отделяем карту от доп. данных
         data = {}
+        data_buildings = {}
         new_field = []
         # self.field = list(map(lambda x: ''.join(x), self.field))
         for row in range(len(self.field)):
@@ -565,13 +572,19 @@ class Field:  # Игровое поле
             lendata = 0
             new_field.append([])
             for col in range(len(self.field[row])):
-                s = self.field[row][col]
-                if s[-1] == '}':
+                content, building = self.field[row][col].split('/')
+                if content[-1] == '}':
                     key = row, col
-                    info = s[s.find('{') + 1:-1]
+                    info = content[content.find('{') + 1:-1]
                     data[key] = info
-                    self.field[row][col] = s[:s.find('{')]
-                new_field[row].append(self.field[row][col])
+                    content = content[:content.find('{')]
+                if building and building[-1] == '}':
+                    key = row, col
+                    info = building[building.find('{') + 1:-1]
+                    data_buildings[key] = info
+                    building = building[:building.find('{')]
+                new_field[row].append([content, building])
+
         self.field = new_field
 
         self.width = len(self.field[0])
@@ -584,11 +597,12 @@ class Field:  # Игровое поле
 
         for x in range(self.height):
             for y in range(self.width):
-                if self.field[x][y] == '.':
+                content, building = self.field[x][y]
+                if content == '.':
                     self.field[x][y] = Cell()
-                elif self.field[x][y] == '#':
+                elif content == '#':
                     self.field[x][y] = Cell(content=Block())
-                elif self.field[x][y] == 'G':
+                elif content == 'G':
                     self.players[GREEN] = [Player(x, y, GREEN)]
                     if (x, y) in data:
                         weapon, shield, helmet, boots, chest, bonus, army, movepoints, money = \
@@ -611,7 +625,7 @@ class Field:  # Игровое поле
                         self.players[GREEN][0].money = int(money)
                     self.field[x][y] = Cell(content=self.players[GREEN][0])
 
-                elif self.field[x][y] == 'R':
+                elif content == 'R':
                     if self.number_of_players >= 2:
                         self.players[RED] = [Player(x, y, RED)]
                         if (x, y) in data:
@@ -639,7 +653,7 @@ class Field:  # Игровое поле
                     else:
                         self.field[x][y] = Cell()
 
-                elif self.field[x][y] == 'B':
+                elif content == 'B':
                     if self.number_of_players >= 3:
                         self.players[BLUE] = [Player(x, y, BLUE)]
                         if (x, y) in data:
@@ -667,11 +681,11 @@ class Field:  # Игровое поле
                     else:
                         self.field[x][y] = Cell()
 
-                elif self.field[x][y] == 'Y':
+                elif content == 'Y':
                     if self.number_of_players >= 4:
                         self.players[YELLOW] = [Player(x, y, YELLOW)]
                         if (x, y) in data:
-                            weapon, shield, helmet, boots, chest, bonus, army, movepoints = data[
+                            weapon, shield, helmet, boots, chest, bonus, army, movepoints, money = data[
                                 (x, y)].split('&')
                             atc = sum(map(lambda x: ITEMS[x].d_atc,
                                           (weapon, shield, helmet, boots, chest)))
@@ -694,10 +708,15 @@ class Field:  # Игровое поле
                         self.field[x][y] = Cell(content=self.players[YELLOW][0])
                     else:
                         self.field[x][y] = Cell()
-                elif self.field[x][y] in ITEMS:
-                    self.field[x][y] = Cell(content=ITEMS[self.field[x][y]])
-                elif self.field[x][y] in HOUSES:
-                    self.field[x][y] = Cell(building=House(x, y, self.field[x][y] + '.png', *HOUSES[self.field[x][y]]))
+                elif content in ITEMS:
+                    self.field[x][y] = Cell(content=ITEMS[content])
+                else:
+                    raise Exception(f"Incorrect content in slot{self.save_slot + 1}: {content}")
+
+                if building in HOUSES:
+                    self.field[x][y].building = House(x, y, building + '.png', *HOUSES[building])
+                    if (x, y) in data_buildings:
+                        self.field[x][y].building.bought = bool(int(data_buildings[(x, y)]))
                 self.field[x][y].render(x, y)
 
     def get_click(self, event):
@@ -863,6 +882,7 @@ class Field:  # Игровое поле
                 if type(self.field[x][y]).__name__ == 'Cell':
                     cell = self.field[x][y]
                     content = cell.get_content()
+                    building = cell.get_building()
                     if content is None:
                         new_field[x] += '.'
                     elif type(content).__name__ == 'Block':
@@ -882,6 +902,10 @@ class Field:  # Игровое поле
                         new_field[x] += content.tile_type
                     elif type(content).__name__ == 'NPC':
                         pass
+
+                    new_field[x] += '/'
+                    if building is not None:
+                        new_field[x] += f"{building.key_in_library}{{{int(building.bought)}}}"
                 new_field[x] += ';'
             new_field[x] = new_field[x][:-1]
 
@@ -1073,7 +1097,7 @@ def fight(left_hero, right_hero):
 
 class Player(pygame.sprite.Sprite):
     default_image = pygame.transform.scale(load_image('player.png', -1), (tile_width, tile_height))
-    null_unit = UNITS["angel"] #Unit("player.png", "", 0, 0, 0, 0, 0, 0, 0)
+    null_unit = UNITS["null"] #Unit("player.png", "", 0, 0, 0, 0, 0, 0, 0)
     null_item = ITEMS["null"]
     moving_animation = itertools.cycle(
         [pygame.transform.scale(load_image(f'heroes/default/{i}.png'), (tile_width, tile_height)) for
@@ -1180,7 +1204,8 @@ class Player(pygame.sprite.Sprite):
 
 
 class House(pygame.sprite.Sprite):
-    def __init__(self, row, col, image_name, unit, cost, delta):
+    def __init__(self, row, col, image_name, unit, cost, delta, key):
+        self.key_in_library = key
         self.unit, self.cost, self.delta = unit, cost, delta
         self.unit.count = delta
         self.bought = False
