@@ -7,7 +7,7 @@ import networkx
 import pygame
 
 GREEN, RED, BLUE, YELLOW = 'green', 'red', 'blue', 'yellow'
-selected_hero, current_color = None, GREEN
+selected_hero = None
 sel_her_row, sel_her_col = None, None
 last_row, last_col = -1, -1
 
@@ -81,6 +81,7 @@ player_sprites = pygame.sprite.Group()
 unit_sprites = pygame.sprite.Group()
 arrow_sprites = pygame.sprite.Group()
 house_sprites = pygame.sprite.Group()
+neutral_sprites = pygame.sprite.Group()
 inputbox_sprites = pygame.sprite.Group()
 
 
@@ -394,6 +395,7 @@ UNITS = {
     'null': Unit("null.png", "", 0, 0, 0, 0, 0, 0, 0),
 }
 
+# Библиотека зданий
 HOUSES = {
     'hair': (UNITS['air'], 1, 8, 'hair'),
     'hangel': (UNITS['angel'], 5, 1, 'hangel'),
@@ -407,6 +409,12 @@ HOUSES = {
     'hpegas': (UNITS['pegas'], 3, 4, 'hpegas'),
     'hpikeman': (UNITS['pikeman'], 1, 6, 'hpikeman'),
     'hswordsman': (UNITS['swordsman'], 3, 4, 'hswordsman'),
+}
+
+# Библиотека нейтральных персонажей
+NEUTRALS = {
+    '<neutral_character>': ('<image>', '<name>', '<attack>', '<defence>', '<neutral_character>'),
+    # TODO: Составить нормальный набор нейтральных персонажей
 }
 
 
@@ -782,6 +790,8 @@ class Field:  # Игровое поле
                         self.field[x][y] = Cell()
                 elif content in ITEMS:
                     self.field[x][y] = Cell(content=ITEMS[content])
+                elif content in NEUTRALS:
+                    self.field[x][y] = Cell(content=Neutral(x, y, *NEUTRALS[content]))
                 else:
                     raise Exception(f"Incorrect content in slot{self.save_slot + 1}: {content}")
 
@@ -1430,6 +1440,19 @@ class Player(pygame.sprite.Sprite):
                                        (tile_width, tile_height)),
                 reversed, False) for i in
                 range(len([name for name in os.listdir('data/images/heroes/default')]) - 1)])
+
+
+class Neutral(pygame.sprite.Sprite):
+    def __init__(self, row, col, image, name, attack, defence, key):
+        super().__init__(neutral_sprites)
+        self.row, self.col = row, col
+        self.image = pygame.transform.scale(load_image(image), (tile_width, tile_height))
+        self.rect = self.image.get_rect().move(tile_width * col, tile_height * row)
+        self.name = name
+        self.atc, self.dfc = attack, defence
+        self.key_in_library = key
+
+    # TODO: методы в Neutral
 
 
 class House(pygame.sprite.Sprite):
