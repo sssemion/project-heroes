@@ -112,6 +112,7 @@ class Unit(pygame.sprite.Sprite):
     def __init__(self, image, name, attack, defence, min_dmg, max_dmg, count, speed, hp, key='null'):
         self.key_in_library = key
         super().__init__(unit_sprites)
+        self.image_filename = image
         self.image = load_image(image)
         self.dead = 0
         self.counter = True
@@ -120,11 +121,27 @@ class Unit(pygame.sprite.Sprite):
             count, name, attack, defence, min_dmg, max_dmg, speed, hp
         self.cur_atc, self.cur_dfc, self.cur_spd, self.cur_hp, self.cur_top_hp = \
             attack, defence, speed, hp, hp
+        self.rect = pygame.Rect(0, 0, 0, 0)
 
     def attack_rat(self, enemy):
         damage = random.randint(self.min_dmg, self.max_dmg) * (self.cur_atc / enemy.cur_dfc) * (
                 self.count + 1)
         enemy.get_rat_damage(damage)
+
+    def resize(self, width, height):
+        self.image = pygame.transform.scale(self.image, (width, height))
+        self.rect.width = width
+        self.rect.height = height
+
+    def set_rect(self, rect):
+        self.rect = rect
+
+    def move(self, x, y):
+        self.rect.x = x
+        self.rect.y = y
+
+    def reverse(self):
+        self.image = pygame.transform.flip(self.image, True, False)
 
     def attack_hon(self, enemy):
         damage = random.randint(self.min_dmg, self.max_dmg) * (self.cur_atc / enemy.cur_dfc) * (
@@ -165,6 +182,9 @@ class Unit(pygame.sprite.Sprite):
             # ... other types
             else:
                 raise Exception(f'incorrect updating_type: {updating_type}')
+
+    def copy(self):
+        return Unit(self.image_filename, self.name, self.atc, self.dfc, self.min_dmg, self.max_dmg, self.count, self.spd, self.hp)
 
     def __lt__(self, other):
         if self.spd < other.spd:
@@ -889,12 +909,12 @@ class FightBoard:
         self.surface = pygame.Surface((width, height))
         self.surface.blit(
             pygame.transform.scale(load_image('fight-background.jpg'), (width, height)), (0, 0))
+        self.active_units = pygame.sprite.Group()
 
     def draw_cells(self):
         self.rows = len(self.board)
         self.cols = len(self.board[0])
-        self.cell_width = (
-                                  self.width - FightBoard.margin_left - FightBoard.margin_right) // self.cols
+        self.cell_width = (self.width - FightBoard.margin_left - FightBoard.margin_right) // self.cols
         self.cell_height = (
                                    self.height - FightBoard.margin_top - FightBoard.margin_bottom) // self.rows
         cells_surface = pygame.Surface(
@@ -910,7 +930,23 @@ class FightBoard:
                               self.height - FightBoard.margin_top - FightBoard.margin_bottom), 2)
         cells_surface.set_colorkey(0x000000)
         cells_surface.set_alpha(128)
+
+        for row in range(self.rows):
+            for col in range(self.cols):
+                if self.board[row][col] is not None:
+                    self.active_units.add(self.board[row][col])
+                    self.board[row][col].resize(self.cell_width, self.cell_height)
+
+
         self.surface.blit(cells_surface, (FightBoard.margin_right, FightBoard.margin_top))
+
+    def draw_units(self):
+        for row in range(self.rows):
+            for col in range(self.cols):
+                if self.board[row][col] is not None:
+                    self.board[row][col].move(self.margin_left + col * self.cell_width,
+                                                              self.margin_top + row * self.cell_height)
+        self.active_units.draw(self.surface)
 
     def get_click(self, mouse_pos):
         cell = self.get_cell(mouse_pos)
@@ -1007,16 +1043,20 @@ class HeroFightScreen:
 def fight(left_hero, right_hero):
     coor_row = [0, 1, 3, 4, 5, 7, 8]
     null_unit = Unit("player.png", "", 0, 0, 0, 0, 0, 0, 0)
-    board = [[0] * 10 for _ in range(9)]
+    board = [[None] * 10 for _ in range(9)]
     turn_queue = left_hero.army + right_hero.army
+
 
     for num in range(len(left_hero.army)):
         if left_hero.army[num] != null_unit:
             board[coor_row[num]][0] = left_hero.army[num]
 
+
     for num in range(len(right_hero.army)):
         if right_hero.army[num] != null_unit:
             board[coor_row[num]][9] = right_hero.army[num]
+            board[coor_row[num]][9].reverse()
+
 
     # Сохраняем основной экран и затемняем его
     screen_save = screen.copy()
@@ -1060,6 +1100,8 @@ def fight(left_hero, right_hero):
                 x -= topleft_coord[0]
                 y -= topleft_coord[1]
                 fight_board.get_click((x, y))
+        fight_board.draw_units()
+        screen.blit(fight_board.surface, topleft_coord)
         pygame.display.flip()
         clock.tick(FPS)
 
@@ -1067,7 +1109,7 @@ def fight(left_hero, right_hero):
 class Player(pygame.sprite.Sprite):
     default_image = pygame.transform.scale(load_image('player.png', -1), (tile_width, tile_height))
     null_item = ITEMS['null']
-    null_unit = Unit("player.png", "", 0, 0, 0, 0, 0, 0, 0)
+    null_unit = UNITS["null"]  # Unit("player.png", "", 0, 0, 0, 0, 0, 0, 0)
     moving_animation = itertools.cycle(
         [pygame.transform.scale(load_image(f'heroes/default/{i}.png'), (tile_width, tile_height)) for
          i in range(len([name for name in os.listdir('data/images/heroes/default')]) - 1)])
@@ -1092,7 +1134,12 @@ class Player(pygame.sprite.Sprite):
         self.money = 0
         self.inventory = equipped_items + [self.money]
         self.bonus = {'sale': 1, 'd_hp': 0, 'bonus_move': 0, 'd_spd': 0}
-        self.army = [Player.null_unit] * 7
+        self.army = [Player.null_unit.copy() for i in range(7)]
+        self.army[1] = UNITS['gnom'].copy()
+        self.army[2] = UNITS['pegas'].copy()
+        self.army[3] = UNITS['ogre'].copy()
+        self.army[4] = UNITS['swordsman'].copy()
+        self.army[5] = UNITS['pikeman'].copy()
         self.movepoints = 2000
 
     def move(self, x, y):
