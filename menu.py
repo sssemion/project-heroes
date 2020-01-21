@@ -108,6 +108,17 @@ class Item:
     def stats(self):
         return self.name, self.d_atc, self.d_dfc, self.description, self.feature
 
+    def get_stats(self):
+        a, d = self.d_atc, self.d_dfc
+        ans = f'Защита: {"+" if d >= 0 else ""}{d}\nАтака: {"+" if a >= 0 else ""}{a}'
+        if self.feature is not None:
+            for key, val in self.feature.items():
+                if key == 'bonus_move':
+                    ans += f'\nПередвижение: +{val}'
+                elif key == 'sale':
+                    ans += f'\nСкидка: -{val}'
+        return ans
+
 
 class Unit(pygame.sprite.Sprite):
     def __init__(self, image, name, attack, defence, min_dmg, max_dmg, count, speed, hp, key='null'):
@@ -342,7 +353,7 @@ ITEMS = {
     'hornhelm': Item('Шлем стада единорогов', 10, 8, "Шлем с трофеями стального единорога", 'helm',
                      'hornhelm'),
 
-    'darkboots': Item('Боты обмана', -2, -6, "Ботинки обманщика-марафонца", 'boots', 'darkboots',
+    'darkboots': Item('Боты обмана', -2, -6, "Ботинки обманщика- марафонца", 'boots', 'darkboots',
                       {'bonus_move': 500}),
     'saintboots': Item('Сандали Мироздателя', 4, 4, "Сандали Мироздателя", 'boots', 'saintboots'),
     'speedboots': Item('Скороходы', 0, 0, "Ботинки из душ лошадей", 'boots', 'speedboots',
@@ -365,7 +376,7 @@ ITEMS = {
     'costring': Item('Лента дипломата', 0, 0, "Кольцо дипломата. Все идут за вами", 'other',
                      'costring', {'sale': 1}),
     'null': Item('', 0, 0, '', "all", "null"),
-    'coins': Item('coins', 0, 0, '', 'coins'),
+    'coins': Item('Деньги', 0, 0, 'Просто деньги', 'coins'),
 }
 
 # Библиотека карт
@@ -480,6 +491,7 @@ class ControlPanel:  # Панель управления в правой час�
         self.next_player_button.set_text("Следующий ход", font, pygame.color.Color(156, 130, 79))
         self.next_player_button.set_background_image("button-background.jpg")
         self.next_player_button.render()
+        self.cell_info = pygame.Surface((0, 0))
 
     def draw(self):
         self.surface.blit(self.backgroung, (0, 0))
@@ -495,6 +507,8 @@ class ControlPanel:  # Панель управления в правой час�
         self.surface.blit(current_player, ((self.width - current_player.get_width()) // 2, y_coord))
         y_coord += current_player.get_height() + 10
 
+        y_info = self.next_player_button.y - self.cell_info.get_height() - 10
+        self.surface.blit(self.cell_info, ((self.width - self.cell_info.get_width()) // 2, y_info))
         button_sprites.draw(self.surface)
 
         screen.blit(self.surface, (WIDTH - self.width, 0))
@@ -536,8 +550,58 @@ class ControlPanel:  # Панель управления в правой час�
             coord += h + 2
         return text_surf
 
+    def render_cell_info(self, cell):
+        if cell is None:
+            return pygame.Surface((0, 0))
+        cell = self.field.field[cell[0]][cell[1]]
+        content = cell.get_content()
+        building = cell.get_building()
+        text = ""
+        if content is not None:
+            try:
+                name = content.name.split()
+                line = ''
+                if name:
+                    line = name[0]
+                    for i in range(1, len(name)):
+                        if len(line) + len(name[i]) < 18:
+                            line += ' ' + name[i]
+                        else:
+                            text += '\n' + line
+                            line = name[i]
+                    text += '\n' + line
+                description = content.description.split()
+                line = ''
+                if description:
+                    text += '\n'
+                    line = description[0]
+                    for i in range(1, len(description)):
+                        if len(line) + len(description[i]) < 18:
+                            line += ' ' + description[i]
+                        else:
+                            text += '\n' + line
+                            line = description[i]
+                    text += '\n' + line
+            except AttributeError:
+                pass
+            try:
+                text += '\n\n' + content.get_stats()
+            except AttributeError:
+                pass
+        font = pygame.font.Font('data/16478.otf', 24)
+        lines = text.split('\n')
+        text_surf = pygame.Surface((self.width, len(lines) * 30), flags=pygame.SRCALPHA)
+        coord = 0
+        for i, line in enumerate(lines):
+            rendered = font.render(line, True, pygame.color.Color(156, 130, 79))
+            w, h = rendered.get_size()
+            text_surf.blit(rendered, ((self.width - w) // 2, coord))
+            coord += h + 2
+        return text_surf
+
     def update(self, event):
         if event.type == pygame.MOUSEMOTION or event.type == pygame.MOUSEBUTTONDOWN:
+            self.cell_info = self.render_cell_info(self.field.get_cell(event.pos))
             event.pos = event.pos[0] - WIDTH + self.width, event.pos[1]
             button_sprites.update(event)
 
@@ -571,7 +635,7 @@ class Field:  # Игровое поле
 
         self.width = len(self.field[0])
         self.height = len(self.field)
-        self.players = {}
+        self.players = {GREEN: [], RED: [], BLUE: [], YELLOW: []}
 
         self.names = self.names.split(';')
         self.number_of_players = len(self.names)
@@ -679,11 +743,11 @@ class Field:  # Игровое поле
                         bonus = list(map(int, bonus.split(',')))
                         self.players[GREEN][0].atc = atc
                         self.players[GREEN][0].dfc = dfc
-                        self.players[GREEN][0].equipped_weapon = weapon
-                        self.players[GREEN][0].equipped_shield = shield
-                        self.players[GREEN][0].equipped_helmet = helmet
-                        self.players[GREEN][0].equipped_boots = boots
-                        self.players[GREEN][0].equipped_chest = chest
+                        self.players[GREEN][0].equipped_weapon = ITEMS[weapon]
+                        self.players[GREEN][0].equipped_shield = ITEMS[shield]
+                        self.players[GREEN][0].equipped_helmet = ITEMS[helmet]
+                        self.players[GREEN][0].equipped_boots = ITEMS[boots]
+                        self.players[GREEN][0].equipped_chest = ITEMS[chest]
                         self.players[GREEN][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1],
                                                         'bonus_move': bonus[2],
                                                         'd_spd': bonus[3]}
@@ -707,11 +771,11 @@ class Field:  # Игровое поле
                             bonus = list(map(int, bonus.split(',')))
                             self.players[RED][0].atc = atc
                             self.players[RED][0].dfc = dfc
-                            self.players[RED][0].equipped_weapon = weapon
-                            self.players[RED][0].equipped_shield = shield
-                            self.players[RED][0].equipped_helmet = helmet
-                            self.players[RED][0].equipped_boots = boots
-                            self.players[RED][0].equipped_chest = chest
+                            self.players[RED][0].equipped_weapon = ITEMS[weapon]
+                            self.players[RED][0].equipped_shield = ITEMS[shield]
+                            self.players[RED][0].equipped_helmet = ITEMS[helmet]
+                            self.players[RED][0].equipped_boots = ITEMS[boots]
+                            self.players[RED][0].equipped_chest = ITEMS[chest]
                             self.players[RED][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1],
                                                           'bonus_move': bonus[2],
                                                           'd_spd': bonus[3]}
@@ -738,11 +802,11 @@ class Field:  # Игровое поле
                             bonus = list(map(int, bonus.split(',')))
                             self.players[BLUE][0].atc = atc
                             self.players[BLUE][0].dfc = dfc
-                            self.players[BLUE][0].equipped_weapon = weapon
-                            self.players[BLUE][0].equipped_shield = shield
-                            self.players[BLUE][0].equipped_helmet = helmet
-                            self.players[BLUE][0].equipped_boots = boots
-                            self.players[BLUE][0].equipped_chest = chest
+                            self.players[BLUE][0].equipped_weapon = ITEMS[weapon]
+                            self.players[BLUE][0].equipped_shield = ITEMS[shield]
+                            self.players[BLUE][0].equipped_helmet = ITEMS[helmet]
+                            self.players[BLUE][0].equipped_boots = ITEMS[boots]
+                            self.players[BLUE][0].equipped_chest = ITEMS[chest]
                             self.players[BLUE][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1],
                                                            'bonus_move': bonus[2],
                                                            'd_spd': bonus[3]}
@@ -769,11 +833,11 @@ class Field:  # Игровое поле
                             bonus = list(map(int, bonus.split(',')))
                             self.players[YELLOW][0].atc = atc
                             self.players[YELLOW][0].dfc = dfc
-                            self.players[YELLOW][0].equipped_weapon = weapon
-                            self.players[YELLOW][0].equipped_shield = shield
-                            self.players[YELLOW][0].equipped_helmet = helmet
-                            self.players[YELLOW][0].equipped_boots = boots
-                            self.players[YELLOW][0].equipped_chest = chest
+                            self.players[YELLOW][0].equipped_weapon = ITEMS[weapon]
+                            self.players[YELLOW][0].equipped_shield = ITEMS[shield]
+                            self.players[YELLOW][0].equipped_helmet = ITEMS[helmet]
+                            self.players[YELLOW][0].equipped_boots = ITEMS[boots]
+                            self.players[YELLOW][0].equipped_chest = ITEMS[chest]
                             self.players[YELLOW][0].bonus = {'sale': bonus[0], 'd_hp': bonus[1],
                                                              'bonus_move': bonus[2],
                                                              'd_spd': bonus[3]}
@@ -804,26 +868,25 @@ class Field:  # Игровое поле
         if cell is not None:
             self.on_click(cell, event.button)
 
-    def get_cell(self, mouse_pos):
+    def get_cell(self, pos):
         x_shift = min(0, cam.get_x_shift())
         y_shift = min(0, cam.get_y_shift())
-        if not (Field.margin_left <= mouse_pos[
-            0] + x_shift <= Field.margin_left + self.width * tile_width) or \
-                not (Field.margin_top <= mouse_pos[
-                    1] + y_shift <= Field.margin_top + self.height * tile_height) or \
-                not (mouse_pos[0] < Field.size_in_pixels[0] and mouse_pos[1] < Field.size_in_pixels[
-                    1]):
+        if not (self.margin_left <= pos[0] < self.size_in_pixels[0] - self.margin_right
+                and self.margin_top <= pos[1] < HEIGHT - self.margin_bottom
+                and pos[0] < Field.size_in_pixels[0] and pos[1] < Field.size_in_pixels[1]
+                and pos[0] < (self.width - cam.cols) * tile_width
+                and pos[1] < (self.height - cam.rows) * tile_height):
             return None
-        return (mouse_pos[1] - Field.margin_top + cam.get_y_shift()) // tile_height, (
-                mouse_pos[0] - Field.margin_left + cam.get_x_shift()) // tile_width  # row col
+        return (pos[1] - Field.margin_top + cam.get_y_shift()) // tile_height, (
+                pos[0] - Field.margin_left + cam.get_x_shift()) // tile_width  # row col
 
     def on_click(self, cell, action):
         global sel_her_col, sel_her_row, last_row, last_col, selected_hero, path
         if action == 1 and selected_hero is not None:
             if selected_hero.get_pos() == cell[::-1]:
                 return
-            if (last_row, last_col) == cell and len(path) * 100 <= selected_hero.movepoints:
-                selected_hero.movepoints -= len(path) * 100
+            if (last_row, last_col) == cell and (len(path) - 1) * 100 <= selected_hero.movepoints:
+                selected_hero.movepoints -= (len(path) - 1) * 100
                 # Убираем стрелочки
                 arrow_sprites.empty()
 
@@ -865,6 +928,8 @@ class Field:  # Игровое поле
                     building = self.field[row][col].get_building()
                     if content is not None:
                         selected_hero.interact(content)
+                        if not self.players[self.current_team]:
+                            return
                     if building is not None:
                         selected_hero.interact(building)
                     self.field[row][col].content = selected_hero
@@ -992,7 +1057,7 @@ class Field:  # Игровое поле
             new_field[x] = new_field[x][:-1]
 
         file = open(os.path.join("data/saves", f"{self.save_slot}.txt"), 'w', encoding='utf-8')
-        file.write(self.game_name + ';' + self.days, '\n')
+        file.write(self.game_name + ';' + str(self.days) + '\n')
         file.write(self.map_name + '\n')
         file.write(';'.join(self.names) + '\n')
         height = len(new_field)
@@ -1002,24 +1067,31 @@ class Field:  # Игровое поле
 
     def next_player(self):
         global selected_hero
-        cur_player = self.players[self.current_team][0]
-        if cur_player.movepoints != 0:
-            yes = dialog(
-                f"У вашего героя осталось\n{cur_player.movepoints} очков передвижения\nВы уверены, что хотите\nзавершить ход?")
-            if yes:
+        prev_team = self.current_team
+        if self.players[self.current_team]:
+            cur_player = self.players[self.current_team][0]
+            if cur_player.movepoints != 0:
+                yes = dialog(
+                    f"У вашего героя осталось\n{cur_player.movepoints} очков передвижения\nВы уверены, что хотите\nзавершить ход?")
+                if yes:
+                    self.days += 1
+                    self.current_team = list(self.teams.keys())[self.days % self.number_of_players]
+                else:
+                    return
+            else:
                 self.days += 1
                 self.current_team = list(self.teams.keys())[self.days % self.number_of_players]
-            else:
-                return
+            cur_player.movepoints = Player.default_movepoints + cur_player.bonus['bonus_move']
         else:
             self.days += 1
             self.current_team = list(self.teams.keys())[self.days % self.number_of_players]
-        cur_player.movepoints = Player.default_movepoints + cur_player.bonus['bonus_move']
 
-        while not self.players[
-            self.current_team]:  # Если игрока убили, нужно передать ход следующему
+        while not self.players[self.current_team]:
+            # Если игрока убили, нужно передать ход следующему
             self.days += 1
             self.current_team = list(self.teams.keys())[self.days % self.number_of_players]
+        if self.current_team == prev_team:
+            winner(self.teams[self.current_team])
         selected_hero = None
 
 
@@ -1036,7 +1108,6 @@ class FightBoard:
         self.chosen_unit = self.queue.pop(0)
         self.copy_board = [[(i.copy() if type(i).__name__ == 'Unit' else i) for i in j] for j in
                            self.board]
-        print(id(self.copy_board[0][0]) == id(self.board[0][0]))
         self.vars = self.voln(self.chosen_unit.fight_row, self.chosen_unit.fight_col,
                               self.chosen_unit.spd,
                               self.copy_board)
@@ -1076,6 +1147,20 @@ class FightBoard:
                     self.active_units.add(self.board[row][col])
                     self.board[row][col].resize(self.cell_width, self.cell_height)
 
+        selected_row, selected_col = self.chosen_unit.fight_row, self.chosen_unit.fight_col
+
+        white = pygame.Surface((self.cell_width, self.cell_height))
+        white.fill(0xffffff)
+        white.set_alpha(128)
+
+        for row in range(len(self.vars)):
+            for col in range(len(self.vars[row])):
+                if self.vars[row][col]:
+                    cells_surface.blit(white, (col * self.cell_width, row * self.cell_height))
+
+        pygame.draw.rect(cells_surface, 0xff0000, (selected_col * self.cell_width,
+                                                   selected_row * self.cell_height,
+                                                   self.cell_width + 1, self.cell_height + 1), 2)
         self.surface.blit(cells_surface, (FightBoard.margin_right, FightBoard.margin_top))
 
     def draw_units(self):
@@ -1089,13 +1174,12 @@ class FightBoard:
 
     def get_click(self, mouse_pos):
         cell = self.get_cell(mouse_pos)
-        return self.on_click(cell)
+        if cell is not None:
+            return self.on_click(cell)
 
     def get_cell(self, mouse_pos):
-        if not (FightBoard.margin_left <= mouse_pos[
-            0] <= FightBoard.margin_left + self.width * self.cell_width) or not (
-                FightBoard.margin_top <= mouse_pos[
-            1] <= FightBoard.margin_top + self.height * self.cell_height):
+        if not (self.margin_left <= mouse_pos[0] <= self.width - self.margin_right) or not (
+                self.margin_top <= mouse_pos[1] <= self.height - self.margin_bottom):
             return None
         return (mouse_pos[1] - FightBoard.margin_top) // self.cell_height, (
                 mouse_pos[0] - FightBoard.margin_left) // self.cell_width
@@ -1290,16 +1374,17 @@ def fight(left_hero, right_hero):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 terminate()
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    screen.blit(screen_save, (0, 0))
-                    return
+            # elif event.type == pygame.KEYDOWN:
+            #     if event.key == pygame.K_ESCAPE:
+            #         screen.blit(screen_save, (0, 0))
+            #         return
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 x, y = pygame.mouse.get_pos()
                 x -= topleft_coord[0]
                 y -= topleft_coord[1]
                 a = fight_board.get_click((x, y))
                 if a is not None:
+                    screen.blit(screen_save, (0, 0))
                     return a
                     # fight_board.draw_cells()
         fight_board.draw_units()
@@ -1356,28 +1441,30 @@ class Player(pygame.sprite.Sprite):
         if type(other).__name__ == 'Player':
             if other.team != self.team:
                 res = fight(self, other)
-                if res is not None and res[0] == 'left':
-                    field.field[self.pos[1]][self.pos[0]].content = other
-                    other.army = []
+                if res is not None and res[0] == 'left':  # Побеждает self
+                    field.field[self.pos[1]][self.pos[0]].content = self
                     for i in range(7):
-                        if i <= len(res[1]) - 1:
-                            other.army.append(res[1][i])
-                        else:
-                            other.army.append(Player.null_unit)
+                        if self.army[i] == Player.null_unit:
+                            if i <= len(res[1]) - 1:
+                                self.army.append(res[1][i])
+                            else:
+                                self.army.append(Player.null_unit)
                     field.players[other.team] = []
                     other.kill()
                     field.field[self.pos[1]][self.pos[0]].render(self.pos[0], self.pos[1])
-                elif res is not None and res[0] == 'right':
-                    field.field[self.pos[1]][self.pos[0]].content = self
+                elif res is not None and res[0] == 'right':  # Побеждает other
+                    field.field[self.pos[1]][self.pos[0]].content = other
                     self.army = []
                     for i in range(7):
-                        if i <= len(res[1]) - 1:
-                            other.army.append(res[1][i])
-                        else:
-                            other.army.append(Player.null_unit)
+                        if other.army[i] == Player.null_unit:
+                            if i <= len(res[1]) - 1:
+                                other.army.append(res[1][i])
+                            else:
+                                other.army.append(Player.null_unit)
                     field.players[self.team] = []
                     self.kill()
                     field.field[self.pos[1]][self.pos[0]].render(self.pos[0], self.pos[1])
+                    field.next_player()
         elif type(other).__name__ == 'Item':
             # Обычные предметы меняются на лучшие версии себя
             if other.slot == 'boots' and other.d_atc > self.equipped_boots.d_atc:
@@ -1442,6 +1529,10 @@ class Player(pygame.sprite.Sprite):
                                        (tile_width, tile_height)),
                 reversed, False) for i in
                 range(len([name for name in os.listdir('data/images/heroes/default')]) - 1)])
+
+    def get_stats(self):
+        a, d = self.atc, self.dfc
+        return f'Защита: {d}\nАтака: {a}'
 
 
 class Neutral(pygame.sprite.Sprite):
@@ -1917,6 +2008,10 @@ def select_save_slot(mode):  # mode = "create" or "load"
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 terminate()
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                screen.blit(screen_save, (0, 0))
+                button_sprites = button_sprites_save
+                return
             if event.type == pygame.MOUSEMOTION or event.type == pygame.MOUSEBUTTONDOWN:
                 event.pos = (event.pos[0] - topleft_coord[0], event.pos[1] - topleft_coord[1])
             if ok_btn.clicked:
@@ -1959,18 +2054,18 @@ def dialog(text):
     screen.blit(black, (0, 0))
 
     # Создаем экран для выбора
-    width, height = 700, 300
+    width, height = 700, 350
     topleft_coord = ((WIDTH - width) // 2, (HEIGHT - height) // 2)
     surface = pygame.Surface((width, height), flags=pygame.SRCALPHA)
     surface.blit(fon, (-100, -100))
-    text_coord = 20
+    text_coord = 10
     for line in text.split('\n'):
         rendered = font.render(line, True, pygame.color.Color(156, 130, 79))
         text_coord += rendered.get_height() + 2
         surface.blit(rendered, ((width - rendered.get_width()) // 2, text_coord))
 
-    bwidth, bheight = int(width // 2.5), height // 4
-    left, top = (width - bwidth * 2) // 3, height // 2
+    bwidth, bheight = int(width // 2.5), height // 5
+    left, top = (width - bwidth * 2) // 3, height - int(height // 2.5)
 
     dialog_buttons = pygame.sprite.Group()
     yes_btn = Button(dialog_buttons, width - left - bwidth, top, bwidth, bheight)
@@ -1995,6 +2090,49 @@ def dialog(text):
                 return False
             dialog_buttons.update(event)
         dialog_buttons.draw(surface)
+        screen.blit(surface, topleft_coord)
+        pygame.display.flip()
+        clock.tick(FPS)
+
+
+def winner(name):
+    font = pygame.font.Font('data/16478.otf', 32)
+
+    # Сохраняем основной экран и затемняем его
+    black = pygame.Surface((WIDTH, HEIGHT))
+    black.fill(pygame.color.Color(0, 0, 0))
+    black.set_alpha(200)
+    screen.blit(black, (0, 0))
+
+    # Создаем экран для выбора
+    width, height = 700, 300
+    topleft_coord = ((WIDTH - width) // 2, (HEIGHT - height) // 2)
+    surface = pygame.Surface((width, height), flags=pygame.SRCALPHA)
+    surface.blit(fon, (-100, -100))
+    text_coord = 20
+    text = f"{name} побеждает\nПоздравляем!"
+    for line in text.split('\n'):
+        rendered = font.render(line, True, pygame.color.Color(156, 130, 79))
+        text_coord += rendered.get_height() + 2
+        surface.blit(rendered, ((width - rendered.get_width()) // 2, text_coord))
+
+    bwidth, bheight = int(width // 2), height // 4
+    left, top = (width - bwidth) // 2, height // 2
+
+    winner_button = pygame.sprite.Group()
+    yes_btn = Button(winner_button, width - left - bwidth, top, bwidth, bheight, terminate)
+    yes_btn.set_background_image('button-background.jpg')
+    yes_btn.set_text("Выйти", font, pygame.color.Color(156, 130, 79))
+    yes_btn.render()
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            if event.type == pygame.MOUSEMOTION or event.type == pygame.MOUSEBUTTONDOWN:
+                event.pos = (event.pos[0] - topleft_coord[0], event.pos[1] - topleft_coord[1])
+            winner_button.update(event)
+        winner_button.draw(surface)
         screen.blit(surface, topleft_coord)
         pygame.display.flip()
         clock.tick(FPS)
@@ -2036,7 +2174,9 @@ def start_screen():
                 return new_game()
             if continue_button.clicked or (
                     event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN):
-                return Field(select_save_slot('load'))
+                save_slot = select_save_slot('load')
+                if save_slot is not None:
+                    return Field(save_slot)
             button_sprites.update(event)
         screen.blit(fon, (0, 0))
         button_sprites.draw(screen)
@@ -2145,18 +2285,19 @@ def new_game():
                     name_input.set_incorrect(True)
                 else:
                     save_slot = select_save_slot("create")  # Слот для сохранения
-                    file = open(os.path.join("data/saves", f"{save_slot}.txt"), 'w',
-                                encoding='utf-8')
-                    file.write(name_input.text + ';0\n')
-                    file.write(map_name + '\n')
-                    file.write(';'.join(filter(lambda x: x, (
-                        g_input.text, r_input.text, b_input.text, y_input.text))) + '\n')
-                    field = MAPS[map_name].load()
-                    height = len(field)
-                    for row in range(height):
-                        file.write(';'.join(field[row]) + '\n' * (row != height - 1))
-                    file.close()
-                    return Field(save_slot)
+                    if save_slot is not None:
+                        file = open(os.path.join("data/saves", f"{save_slot}.txt"), 'w',
+                                    encoding='utf-8')
+                        file.write(name_input.text + ';0\n')
+                        file.write(map_name + '\n')
+                        file.write(';'.join(filter(lambda x: x, (
+                            g_input.text, r_input.text, b_input.text, y_input.text))) + '\n')
+                        field = MAPS[map_name].load()
+                        height = len(field)
+                        for row in range(height):
+                            file.write(';'.join(field[row]) + '\n' * (row != height - 1))
+                        file.close()
+                        return Field(save_slot)
 
             inputbox_sprites.update(event)
             button_sprites.update(event)
@@ -2197,6 +2338,7 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT or (
                 event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+            field.save()
             terminate()
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_LCTRL:
