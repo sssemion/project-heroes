@@ -410,7 +410,9 @@ HOUSES = {
 
 # Библиотека нейтральных персонажей
 NEUTRALS = {
-    '<neutral_character>': ('<image>', '<name>', '<attack>', '<defence>', '<neutral_character>'),
+    'bonedragon': ('neutrals/bonedragon.png', 'Костяной дракон', 10, 3, 'bonedragon'),
+    'dread': ('neutrals/dread.png', 'Рыцарь смерти', 7, 2, 'dread'),
+    'ghost': ('neutrals/ghost.png', 'Поглотитель душ', 4, 1, 'bonedragon'),
     # TODO: Составить нормальный набор нейтральных персонажей
 }
 
@@ -852,6 +854,7 @@ class Field:  # Игровое поле
                         tile_sprites.draw(self.space)
                         house_sprites.draw(self.space)
                         player_sprites.draw(self.space)
+                        neutral_sprites.draw(self.space)
                         screen.blit(self.space, (Field.margin_right - cam.get_x_shift(),
                                                  Field.margin_top - cam.get_y_shift()))
                         self.draw_frame()
@@ -1033,6 +1036,7 @@ class FightBoard:
         self.board = board
         self.queue = left + right
         self.queue.sort()
+        self.queue.reverse()
         self.chosen_unit = self.queue.pop(0)
         self.copy_board = [[(i.copy() if type(i).__name__ == 'Unit' else i) for i in j] for j in
                            self.board]
@@ -1089,7 +1093,8 @@ class FightBoard:
 
     def get_click(self, mouse_pos):
         cell = self.get_cell(mouse_pos)
-        return self.on_click(cell)
+        if cell is not None:
+            return self.on_click(cell)
 
     def get_cell(self, mouse_pos):
         if not (FightBoard.margin_left <= mouse_pos[
@@ -1110,9 +1115,8 @@ class FightBoard:
             for turn in self.possible_turns(cell[0], cell[1]):
                 if type(self.board[cell[0] + turn[0]][
                             cell[1] + turn[1]]).__name__ == 'Unit' and not beat:
-                    if self.board[cell[0]][cell[1]].fight_side != self.board[cell[0] + \
-                                                                             turn[0]][
-                        cell[1] + turn[1]].fight_side:
+                    if self.board[cell[0]][cell[1]].fight_side != self.board[cell[0] +
+                                                                             turn[0]][cell[1] + turn[1]].fight_side:
                         self.board[cell[0]][cell[1]].attack_hon(
                             self.board[cell[0] + turn[0]][cell[1] + turn[1]])
                         beat = True
@@ -1145,6 +1149,7 @@ class FightBoard:
             if death:
                 self.queue = self.alive_left + self.alive_right
                 self.queue.sort()
+                self.queue.reverse()
             else:
                 self.queue = self.queue + [self.chosen_unit]
             if not self.alive_left:
@@ -1411,6 +1416,20 @@ class Player(pygame.sprite.Sprite):
             field.field[row][col].render(row, col)
         elif type(other).__name__ == 'House':
             other.visit(self)
+        elif type(other).__name__ == 'Neutral':
+            if other.atc >= self.dfc:
+                if [unit.name for unit in self.army].count(UNITS['null'].name) != 7:
+                    for _ in range(other.dfc):
+                        for i in range(7):
+                            if self.army[i].name != UNITS['null'].name:
+                                self.army[i] = UNITS['null']
+                if [unit.name for unit in self.army].count(UNITS['null'].name) == 7:
+                    field.field[other.row][other.col].content.kill()
+                    field.field[other.row][other.col].content = self
+                    field.field[other.row][other.col].content.kill()
+                    field.players[self.team] = []
+                    field.field[other.row][other.col].content = None
+                    field.next_player()
 
     def get_characteristics(self):
         return self.atc, self.dfc
@@ -1454,6 +1473,8 @@ class Neutral(pygame.sprite.Sprite):
         self.atc, self.dfc = attack, defence
         self.key_in_library = key
 
+    def get_stats(self):
+        return f'Защита: {self.atc}\nАтака: {self.dfc}'
     # TODO: методы в Neutral
 
 
@@ -2268,6 +2289,7 @@ while running:
     house_sprites.draw(field.space)
     arrow_sprites.draw(field.space)
     player_sprites.draw(field.space)
+    neutral_sprites.draw(field.space)
     screen.blit(field.space, (Field.margin_right - cam.get_x_shift(),
                               Field.margin_top - cam.get_y_shift()))
     field.draw_frame()
