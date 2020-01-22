@@ -6,6 +6,12 @@ import sys
 import networkx
 import pygame
 
+from maps import MAPS
+from items import ITEMS
+from units import UNITS
+from houses import HOUSES
+from neutrals import NEUTRALS
+
 GREEN, RED, BLUE, YELLOW = 'green', 'red', 'blue', 'yellow'
 selected_hero = None
 sel_her_row, sel_her_col = None, None
@@ -237,7 +243,7 @@ class Tile(pygame.sprite.Sprite):
         'bestshield': load_image("items/bestshield-floor.png", -1),
         'boneboots': load_image("items/boneboots-floor.png", -1),
         'club': load_image("items/club-floor.png", -1),
-        'costrib': load_image("items/rib-floor.png", -1),
+        'rib': load_image("items/rib-floor.png", -1),
         'costring': load_image("items/ringcost-floor.png", -1),
         'crownhelm': load_image("items/crownhelm-floor.png", -1),
         'darkboots': load_image("items/darkboots-floor.png", -1),
@@ -329,103 +335,17 @@ class Map:
         return self.preview
 
 
-# Библитека предметов
-ITEMS = {
-    'club': Item('Дубина', 2, 0, "Мощная, но неудобная дубина огра", 'weapon', 'club'),
-    'darksword': Item('Зловещий меч', 4, 0, "Постаревший от времени меч мертвеца", 'weapon',
-                      'darksword'),
-    'mace': Item('Кистень', 8, 0, "Сделанный на славу кистень", 'weapon', 'mace'),
-    'titansword': Item('Меч титана', 12, -3, "Тяжелый меч, которым сложно защищаться", 'weapon',
-                       'titansword'),
+for key, val in ITEMS.items():
+    ITEMS[key] = Item(*val)
 
-    'poorshield': Item('Щит бедняка', 0, 2, "Щит мертвого оборванца", 'shield', 'poorshield'),
-    'darkshield': Item('Щит мертвеца', 0, 4, "Ржавый щит, украшенный черепом", 'shield',
-                       'darkshield'),
-    'ironshield': Item('Щит 1000 гномьих судеб', 0, 8, "Щит, над которым старлся город гномов",
-                       'shield', 'ironshield'),
-    'bestshield': Item('Щит печально павшего воина', -3, 12, "Щит последнего воина", 'shield',
-                       'bestshield'),
+for key, val in MAPS.items():
+    MAPS[key] = Map(*val)
 
-    'crownhelm': Item('Корона', 0, 2, "Корона, которая лучше смотрится на королях", 'helm',
-                      'crownhelm'),
-    'darkhelm': Item('Мертвецкий шлем', 0, 4, "Шлем умершего короля мертвых", 'helm', 'darkhelm'),
-    'skullhelm': Item('Шлем-череп', 8, -2, "Проклятый (?) богами шлем", 'helm', 'skullhelm'),
-    'hornhelm': Item('Шлем стада единорогов', 10, 8, "Шлем с трофеями стального единорога", 'helm',
-                     'hornhelm'),
+for key, val in HOUSES.items():
+    HOUSES[key] = (Unit(*HOUSES[key][0]), ) + HOUSES[key][1:]
 
-    'darkboots': Item('Боты обмана', -2, -6, "Ботинки обманщика- марафонца", 'boots', 'darkboots',
-                      {'bonus_move': 500}),
-    'saintboots': Item('Сандали Мироздателя', 4, 4, "Сандали Мироздателя", 'boots', 'saintboots'),
-    'speedboots': Item('Скороходы', 0, 0, "Ботинки из душ лошадей", 'boots', 'speedboots',
-                       {'bonus_move': 1500}),
-    'boneboots': Item('Ботинки погребенных', 2, 2, "Поножи из костей невинных рабов", 'boots',
-                      'boneboots'),
-
-    'poorchest': Item('Школьный нагрудник', 2, 6, "Нагрудник ученика школы наездников", 'chest',
-                      'poorchest'),
-    'firechest': Item('Кираса огня', 4, 9, "Кираса адского пламени", 'chest', 'firechest'),
-    'goldchest': Item('Праздничный наряд', 8, 14, "Торжественное одеяние циклопов по праздникам",
-                      'chest', 'goldchest'),
-    'titanchest': Item('Титаноывй нагрудник', 12, 20, "Нагрудник Герерала Титанов", 'chest',
-                       'titanchest'),
-
-    'speedglove': Item('Конные перчатки', 0, 0, "Перчатки скорой дикости", 'other', 'speedglove',
-                       {'bonus_move': 500}),
-    'rib': Item('Лента дипломата', 0, 0, "Лента дипломата. Все идут за вами", 'other', 'rib',
-                {'sale': 1}),
-    'costring': Item('Лента дипломата', 0, 0, "Кольцо дипломата. Все идут за вами", 'other',
-                     'costring', {'sale': 1}),
-    'null': Item('', 0, 0, '', "all", "null"),
-    'coins': Item('Деньги', 0, 0, 'Просто деньги', 'coins'),
-}
-
-# Библиотека карт
-MAPS = {
-    'example': Map('example.txt', "Карта", "Идеальная карта для начала игры"),
-}
-
-# Библиотека юнитов
-UNITS = {
-    'angel': Unit("units/angel.png", "Ангел", 13, 13, 50, 50, 1, 10, 250, 'angel'),
-    'fire': Unit("units/fire.png", "Огенный элементаль", 15, 10, 50, 50, 1, 10, 250, 'fire'),
-    'horn': Unit("units/horn.png", "Единорог", 12, 9, 50, 50, 1, 10, 'horn'),
-    'cyclope': Unit("units/cyclope.png", "Циклоп", 10, 9, 50, 50, 1, 10, 250, 'cyclope'),
-
-    'pegas': Unit("units/pegas.png", "Пегас", 10, 10, 20, 30, 1, 12, 50, 'pegas'),
-    'ogre': Unit("units/ogre.png", "Огр", 8, 10, 25, 40, 1, 6, 120, 'ogre'),
-    'swordsman': Unit("units/swordsman.png", "Крестоносец", 9, 9, 30, 45, 1, 8, 90, 'swordsman'),
-    'earth': Unit("units/earth.png", "Земляной элементаль", 7, 7, 15, 50, 1, 5, 80, 'earth'),
-
-    'air': Unit("units/air.png", "Воздушный элемнатль", 5, 5, 10, 20, 1, 7, 20, 'air'),
-    'goblin': Unit("units/goblin.png", "Гоблин", 7, 1, 15, 30, 1, 9, 15, 'goblin'),
-    'gnom': Unit("units/gnom.png", "Гном", 3, 6, 50, 50, 1, 4, 30, 'gnom'),
-    'pikeman': Unit("units/pikeman.png", "Копейщик", 2, 4, 10, 15, 1, 8, 40, 'pikeman'),
-    'null': Unit("null.png", "", 0, 0, 0, 0, 0, 0, 0),
-}
-
-# Библиотека зданий
-HOUSES = {
-    'hair': (UNITS['air'], 1, 8, 'hair'),
-    'hangel': (UNITS['angel'], 5, 1, 'hangel'),
-    'hcyclope': (UNITS['cyclope'], 5, 1, 'hcyclope'),
-    'hearth': (UNITS['earth'], 3, 4, 'hearth'),
-    'hfire': (UNITS['fire'], 5, 1, 'hfire'),
-    'hgnom': (UNITS['gnom'], 1, 8, 'hgnom'),
-    'hgoblin': (UNITS['goblin'], 1, 8, 'hgoblin'),
-    'hhorn': (UNITS['horn'], 5, 1, 'hhorn'),
-    'hogre': (UNITS['ogre'], 3, 4, 'hogre'),
-    'hpegas': (UNITS['pegas'], 3, 4, 'hpegas'),
-    'hpikeman': (UNITS['pikeman'], 1, 6, 'hpikeman'),
-    'hswordsman': (UNITS['swordsman'], 3, 4, 'hswordsman'),
-}
-
-# Библиотека нейтральных персонажей
-NEUTRALS = {
-    'bonedragon': ('neutrals/bonedragon.png', 'Костяной дракон', 10, 3, 'bonedragon'),
-    'dread': ('neutrals/dread.png', 'Рыцарь смерти', 7, 2, 'dread'),
-    'ghost': ('neutrals/ghost.png', 'Поглотитель душ', 4, 1, 'bonedragon'),
-    # TODO: Составить нормальный набор нейтральных персонажей
-}
+for key, val in UNITS.items():
+    UNITS[key] = Unit(*UNITS[key])
 
 
 class Block:  # Предмет, блокирующий проход
@@ -743,8 +663,8 @@ class Field:  # Игровое поле
                         dfc = sum(
                             map(lambda x: ITEMS[x].d_dfc, (weapon, shield, helmet, boots, chest)))
                         bonus = list(map(int, bonus.split(',')))
-                        self.players[GREEN][0].atc = atc
-                        self.players[GREEN][0].dfc = dfc
+                        self.players[GREEN][0].atc = atc + 1
+                        self.players[GREEN][0].dfc = dfc + 1
                         self.players[GREEN][0].equipped_weapon = ITEMS[weapon]
                         self.players[GREEN][0].equipped_shield = ITEMS[shield]
                         self.players[GREEN][0].equipped_helmet = ITEMS[helmet]
@@ -771,8 +691,8 @@ class Field:  # Игровое поле
                             dfc = sum(map(lambda x: ITEMS[x].d_dfc,
                                           (weapon, shield, helmet, boots, chest)))
                             bonus = list(map(int, bonus.split(',')))
-                            self.players[RED][0].atc = atc
-                            self.players[RED][0].dfc = dfc
+                            self.players[RED][0].atc = atc + 1
+                            self.players[RED][0].dfc = dfc + 1
                             self.players[RED][0].equipped_weapon = ITEMS[weapon]
                             self.players[RED][0].equipped_shield = ITEMS[shield]
                             self.players[RED][0].equipped_helmet = ITEMS[helmet]
@@ -802,8 +722,8 @@ class Field:  # Игровое поле
                             dfc = sum(map(lambda x: ITEMS[x].d_dfc,
                                           (weapon, shield, helmet, boots, chest)))
                             bonus = list(map(int, bonus.split(',')))
-                            self.players[BLUE][0].atc = atc
-                            self.players[BLUE][0].dfc = dfc
+                            self.players[BLUE][0].atc = atc + 1
+                            self.players[BLUE][0].dfc = dfc + 1
                             self.players[BLUE][0].equipped_weapon = ITEMS[weapon]
                             self.players[BLUE][0].equipped_shield = ITEMS[shield]
                             self.players[BLUE][0].equipped_helmet = ITEMS[helmet]
@@ -833,8 +753,8 @@ class Field:  # Игровое поле
                             dfc = sum(map(lambda x: ITEMS[x].d_dfc,
                                           (weapon, shield, helmet, boots, chest)))
                             bonus = list(map(int, bonus.split(',')))
-                            self.players[YELLOW][0].atc = atc
-                            self.players[YELLOW][0].dfc = dfc
+                            self.players[YELLOW][0].atc = atc + 1
+                            self.players[YELLOW][0].dfc = dfc + 1
                             self.players[YELLOW][0].equipped_weapon = ITEMS[weapon]
                             self.players[YELLOW][0].equipped_shield = ITEMS[shield]
                             self.players[YELLOW][0].equipped_helmet = ITEMS[helmet]
@@ -937,7 +857,10 @@ class Field:  # Игровое поле
                         selected_hero.interact(building)
                     self.field[row][col].content = selected_hero
                     self.field[sel_her_row][sel_her_col].content = None
-                    sel_her_col, sel_her_row = selected_hero.get_pos()
+                    if selected_hero is not None:
+                        sel_her_col, sel_her_row = selected_hero.get_pos()
+                    else:
+                        return
 
                     # Двигаем камеру при необходимости
                     if sel_her_row - cam.rows < 3:
@@ -1050,8 +973,8 @@ class Field:  # Игровое поле
                         new_field[x] += f'{{{inventory}&{bonus}&{army}&{mp}&{money}}}'
                     elif type(content).__name__ == 'Item':
                         new_field[x] += content.tile_type
-                    elif type(content).__name__ == 'NPC':
-                        pass
+                    elif type(content).__name__ == 'Neutral':
+                        new_field[x] += content.key_in_library
 
                     new_field[x] += '/'
                     if building is not None:
@@ -1503,6 +1426,8 @@ class Player(pygame.sprite.Sprite):
         elif type(other).__name__ == 'House':
             other.visit(self)
         elif type(other).__name__ == 'Neutral':
+            field.field[other.row][other.col].content.kill()
+            field.field[other.row][other.col].content = self
             if other.atc >= self.dfc:
                 if [unit.name for unit in self.army].count(UNITS['null'].name) != 7:
                     for _ in range(other.dfc):
@@ -1510,10 +1435,8 @@ class Player(pygame.sprite.Sprite):
                             if self.army[i].name != UNITS['null'].name:
                                 self.army[i] = UNITS['null']
                 if [unit.name for unit in self.army].count(UNITS['null'].name) == 7:
-                    field.field[other.row][other.col].content.kill()
-                    field.field[other.row][other.col].content = self
-                    field.field[other.row][other.col].content.kill()
                     field.players[self.team] = []
+                    self.kill()
                     field.field[other.row][other.col].content = None
                     field.next_player()
 
@@ -2351,8 +2274,8 @@ control_panel = ControlPanel(field, cam)
 black_texture = pygame.transform.scale(load_image("black-texture.png"), (WIDTH, HEIGHT))
 up_counter, down_counter, left_counter, right_counter = [None] * 4
 ctrl_pressed = False
-hold_timeout = 5  # задержка после зажатия кнопки
-hold_speed = 30  # задержка между повторениями зажатых кнопок
+hold_timeout = 1  # задержка после зажатия кнопки
+hold_speed = 15  # задержка между повторениями зажатых кнопок
 
 while running:
     for event in pygame.event.get():
