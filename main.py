@@ -68,7 +68,7 @@ def terminate():
 
 
 def load_image(name, colorkey=None):
-    fullname = os.path.join('data/images', name)
+    fullname = os.path.join('data/images/', name)
     image = pygame.image.load(fullname).convert_alpha()
     if colorkey is not None:
         if colorkey == -1:
@@ -1326,7 +1326,7 @@ class Player(pygame.sprite.Sprite):
     null_item = ITEMS["null"]
     moving_animation = itertools.cycle(
         [pygame.transform.scale(load_image(f'heroes/default/{i}.png'), (tile_width, tile_height)) for
-         i in range(len([name for name in os.listdir('data/images/heroes/default')]) - 1)])
+         i in range(len([name for name in os.listdir('data/images/heroes/default')]) - 2)])
     animation_counter = 0
     default_movepoints = 2000
 
@@ -1469,7 +1469,7 @@ class Player(pygame.sprite.Sprite):
                 pygame.transform.scale(load_image(f'heroes/default/{i}.png'),
                                        (tile_width, tile_height)),
                 reversed, False) for i in
-                range(len([name for name in os.listdir('data/images/heroes/default')]) - 1)])
+                range(len([name for name in os.listdir('data/images/heroes/default')]) - 2)])
 
     def get_stats(self):
         a, d = self.atc, self.dfc
@@ -1489,7 +1489,7 @@ class Neutral(pygame.sprite.Sprite):
     def get_stats(self):
         return f'Защита: {self.atc}\nАтака: {self.dfc}'
     # TODO: методы в Neutral
-
+# TODO: CeMa /\OX
 
 class House(pygame.sprite.Sprite):
     def __init__(self, row, col, image_name, unit, cost, delta, key):
